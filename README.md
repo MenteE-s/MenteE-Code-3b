@@ -60,6 +60,26 @@ Start at **[`docs/README.md`](docs/README.md)** for the index and the 60-second 
 | [`10` Roadmap & Backlog](docs/10-ROADMAP-AND-BACKLOG.md) | Day-by-day, critical path, P0/P1/P2 |
 | [`11` Risks & Fallbacks](docs/11-RISKS-AND-OPEN-QUESTIONS.md) | Every risk with trigger, mitigation, fallback |
 | [`12` Open Questions](docs/12-OPEN-QUESTIONS.md) | What was **not** verified |
+| [`13` The Collector Toolkit](docs/13-COLLECTOR-TOOLKIT.md) | The code: generate → validate → append, the append guarantees, the tool-schema shuffler |
+
+---
+
+## The collector
+
+```bash
+pip install -r requirements-collect.txt
+
+# prove the plumbing on a replay file (no GPU, no agent needed)
+python -m src.collect run --config configs/collect_config.replay.yaml
+
+# check the file is what we think it is
+python -m src.collect verify --path data/processed/v1.0.0/train.jsonl
+```
+
+The loop is **generate one trajectory → validate it → append it → repeat**. The dataset
+file is only ever appended to — never truncated, never rewritten, never reopened for a
+"save" — and a widening integrity schedule checks the file against the collector's own
+belief as it goes.
 
 ---
 
@@ -68,9 +88,12 @@ Start at **[`docs/README.md`](docs/README.md)** for the index and the 60-second 
 ```
 docs/      the documentation set (start here)
 schemas/   canonical JSON Schema for trajectories + the source registry
+src/collect/  the collector toolkit
+configs/   collector config
+tests/     the append, check, schedule and end-to-end tests
 ```
 
-Code, configs and the data pipeline are not yet written — see
+The training pipeline, the evaluator and the gateway are **not yet written** — see
 [`docs/10-ROADMAP-AND-BACKLOG.md`](docs/10-ROADMAP-AND-BACKLOG.md) for the build order.
 
 ---

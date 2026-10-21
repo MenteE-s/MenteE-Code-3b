@@ -113,9 +113,7 @@ vllm serve Qwen/Qwen3-Coder-Next \
 > `--max-model-len 32768` is the card's own OOM advice ✅. Start there; raise only if the trajectory length distribution says you must.
 
 ### 4.3 Why the student is not the teacher
-
-| | Teacher (Coder-Next) | Student (30B-A3B) |
-|---|---|---|
+| | Teacher (Coder-Next) | Student (30B-A3B) ||---|---|---|
 | Fine-tune | Gated DeltaNet LoRA is hard: a standard `target_modules` list trains only ~1/3 of the network ✅; needs `flash-linear-attention` + `causal-conv1d` for ~6–7× speed ✅ | Standard attention → LoRA is a solved problem ✅ |
 | QLoRA VRAM | ~40 GB 📐 | **17.5 GB** ✅ |
 | Serve VRAM @ Q4 | ~45 GB 📐 | **18.6 GB** ✅ |
@@ -124,7 +122,22 @@ vllm serve Qwen/Qwen3-Coder-Next \
 
 The teacher's job is to produce 20k good trajectories. The student's job is to be cheap to serve forever. Using the same model for both would make the beta cost 2× for no benefit.
 
-### 4.4 MoE-specific training rules
+### 4.4 The wire format is fixed; the tool schema is not
+
+The `qwen3_coder` tool-call format ✅ is the **wire format** — it is baked in, and we reuse
+the base's chat template byte-for-byte so the model keeps emitting it.
+
+The **tool schema** (which tools exist, their parameter names) is *not* baked in. It is a
+request parameter, supplied by whichever agent is driving. That is what makes the model
+usable in OpenCode, Cline, Kilo, Roo Code, Claude Code and MenteE SWE alike — and it is why
+the training data deliberately **varies** the tool schema across trajectories.
+
+> 🎯 **The correct frame: the wire format is fixed by the base model (one format, and it is
+> already correct). The tool schema is data, not architecture.**
+
+Full explanation: `01-THESIS-300B-CLASS.md` §2.5 (M5.1) — *the two layers*.
+
+### 4.5 MoE-specific training rules
 
 - **Freeze the router.** Unsloth disables router training by default ✅. Assert router gradients are `None` — a silently-trained router is a classic way to destroy an MoE.
 - **LoRA rank must account for expert width.** For Qwen3-30B-A3B: `m=2048`, expert intermediate `n=768`, `E=128` experts, `k=8` active ✅. At `r=64` each adapter adds `r(m+n)=180,224` params per expert ≈ **11% of the expert matrix** ✅. That is large. 🎯 Start **r=16, attention-only** (`q_proj,k_proj,v_proj,o_proj`) → then r=32 all-linear. Validate that expert weights actually move before trusting the run.

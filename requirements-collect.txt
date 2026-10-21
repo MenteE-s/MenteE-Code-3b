@@ -1,0 +1,16 @@
+# Collector dependencies (data pipeline only).
+#
+# The training stack has its own requirements file (see docs/06-TRAINING.md) —
+# this one is deliberately light so the collector can run on a laptop or a cheap
+# CPU box.
+
+# JSON Schema validation (the Tier A gate). Without it, schema validation is
+# skipped and the collector prints a warning.
+jsonschema>=4.20
+
+# Config files are YAML. A .json config works without this.
+PyYAML>=6.0
+
+# --- optional -------------------------------------------------------------
+# pytest>=7.4      # tests
+# requests>=2.31   # nicer HTTP than urllib if you extend the sources

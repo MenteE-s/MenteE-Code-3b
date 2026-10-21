@@ -1,0 +1,90 @@
+# MenteE Code 3B — collector configuration
+#
+# The collector loop is: generate one trajectory -> validate it -> append it -> repeat.
+# This file is the single source of truth for a run.
+#
+# Start with the replay path to prove the plumbing, then switch to harness.
+
+source:
+  kind: harness                  # harness | replay
+
+  tasks_path: data/tasks/tasks.jsonl
+
+  opencode:
+    server_url: http://127.0.0.1:4096
+    auth_user: opencode
+    auth_password_env: OPENCODE_SERVER_PASSWORD
+    model: ""
+    agent: ""                    # optional OpenCode agent variant
+    timeout_s: 1800
+
+  replay:
+    path: data/raw/replay/        # a .jsonl file or a directory of .json files
+
+  teacher:
+    model: Qwen/Qwen3-Coder-Next
+    revision: main
+    license: Apache-2.0
+    base_url: http://127.0.0.1:8000/v1
+    sampling:                      # from the Qwen3-Coder-Next model card
+      temperature: 1.0
+      top_p: 0.95
+      top_k: 40
+
+  proxy:
+    enabled: false
+    listen_host: 127.0.0.1
+    listen_port: 8010
+    log_dir: data/raw/proxy_logs
+
+  generator:
+    source_id: mentee_synth_v1
+    source_url: internal
+    source_sha256: ""
+    license: Apache-2.0
+    license_verified: true
+    redistributable: true
+    trainable: true
+    collected_by: collector
+    code_version: ""
+    prompt_template: ""
+
+  # The tool schema lives in the REQUEST, not in the weights. Varying it is what
+  # stops the model memorising one harness's tool names and forces it to read
+  # the schema it was given. See docs/01-THESIS-300B-CLASS.md (M5).
+  tool_schema_shuffle:
+    enabled: true
+    probability: 0.35             # fraction of trajectories that get a variant
+    rename_probability: 0.8
+    rename_params_probability: 0.7
+    drop_probability: 0.25
+    add_probability: 0.35
+
+output:
+  path: data/processed/v1.0.0/train.jsonl
+  rejected_path: data/processed/v1.0.0/rejected.jsonl
+  fsync_every: 10
+  resume: true
+
+validation:
+  schema_path: schemas/mentee-trajectory-v1.schema.json
+  tier_b_sample_rate: 0.02        # deep verification (sandbox) on 2% of rows
+  tier_b_timeout_s: 900
+  require_verified: false         # true = only append rows that passed the sandbox
+  min_chars: 400
+  max_chars: 400000
+  max_identical_tool_calls: 3
+
+integrity:
+  enabled: true
+  first_check_at: 10
+  gaps: [30, 45, 60, 90]          # widening: 10, ~40, ~85, ~145, ~235
+  steady_every: 200
+  jitter_ratio: 0.30
+  full_rescan_every: 5            # every 5th check re-parses every line
+  on_failure: abort               # never keep appending to a file that lied
+
+budget:
+  max_rows: null
+  max_minutes: null
+  max_generation_tokens: null

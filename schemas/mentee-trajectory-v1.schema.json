@@ -128,8 +128,8 @@
         "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
         "outcome": {
           "type": "string",
-          "enum": ["solved", "failed", "failed_but_honest", "abandoned", "partial"],
-          "description": "failed_but_honest examples are KEPT — they train honest failure reporting."
+          "enum": ["solved", "failed", "failed_but_honest", "abandoned", "partial", "unlabelled"],
+          "description": "failed_but_honest examples are KEPT — they train honest failure reporting. 'unlabelled' means the outcome was not determined at collection time."
         }
       }
     },
@@ -287,7 +287,10 @@
             },
             "no_secrets": { "type": "boolean" },
             "no_hallucinated_paths": { "type": "boolean" },
-            "patch_applies": { "type": "boolean" },
+            "patch_applies": {
+              "type": ["boolean", "null"],
+              "description": "null until the deep verifier has run; true/false afterwards."
+            },
             "regressions": { "type": "integer" },
             "token_length_ok": { "type": "boolean" },
             "dedup_cluster": { "type": ["string", "null"] }

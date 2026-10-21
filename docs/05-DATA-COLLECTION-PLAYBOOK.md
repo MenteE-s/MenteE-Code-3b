@@ -168,18 +168,29 @@ Docker image per `(repo, base_commit)` — setup is often 80% of the wall-clock.
 **Sampling from the model card:** `temperature=1.0, top_p=0.95, top_k=40` ✅.
 
 **Use a real agent harness**, not a bare completion loop — otherwise you are collecting
-text generation, not agent behaviour. Either:
+text generation, not agent behaviour. The harness is a **plug-in**, not a dependency:
+any agent that emits a structured transcript can be used, and the collector normalises
+it. Candidates:
 
 - **MenteE SWE** (sibling repo) — you already own it, and tuning the model to your own
-  harness is a strategic asset, and
-- **OpenCode** headless — the actual target harness for the beta.
+  harness is a strategic asset.
+- **OpenCode** headless — has a documented headless HTTP server with a structured
+  message/parts API ✅, which makes it the easiest live source to drive.
+- Any other agent, via an adapter.
 
-> 🎯 **Use the same harness you will serve into.** Training on MenteE SWE's tool protocol and
-> then serving into OpenCode means the model has to learn a second tool dialect for no
-> reason. If the beta's target is OpenCode, generate with OpenCode.
+> 🎯 **The model is not trained to one harness's tool names.** The *tool schema* is a
+> request parameter, not something baked into the weights — see
+> `01-THESIS-300B-CLASS.md` §2.5 (M5.1) for the two-layer model. What *is* fixed is the
+> wire format, and that comes from the base model, not from the harness.
 >
-> If you do use both, **tag every trajectory with `generator.harness`** so you can slice the
-> dataset by dialect later and measure which one teaches what.
+> **So: use more than one harness, and vary the tool schema across trajectories.** A
+> dataset with a single tool vocabulary teaches a lookup table ("when the user asks for a
+> file, call `read_file`"). A dataset with varied vocabularies teaches the model to *read
+> the schema it was given*, which is what generalises. The collector does this
+> automatically — see `13-COLLECTOR-TOOLKIT.md` §4.
+>
+> Tag every trajectory with `generator.harness` so you can slice the dataset later and
+> measure which harness teaches what.
 
 **Turn budget:** 20–40 turns per task. Cap it. A run that goes to 150 turns is a rabbit hole
 and teaches wandering.
@@ -392,7 +403,7 @@ Ranked by expected value per hour of your weekend:
 - [ ] **Write the source registry** with your first 30 candidate repos; **verify each licence by reading it** (not from memory)
 - [ ] **Build the sandbox** and prove it on 5 known-good repos (baseline green)
 - [ ] **Bring up the teacher** — vLLM + `Qwen3-Coder-Next` on a 48 GB card
-- [ ] **Wire the harness** — OpenCode headless, writing to the schema
+- [ ] **Wire a harness** — pick one, get it emitting a structured transcript, write the schema
 - [ ] **Collect 20 end-to-end** and hand-QC all 20. Fix every failure you find.
 - [ ] **Check the failures**: are the "failures" real failures, or sandbox problems? (This is where you lose a weekend if you're not careful.)
 

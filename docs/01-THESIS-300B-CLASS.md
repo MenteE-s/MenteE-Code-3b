@@ -95,6 +95,47 @@ good its code is.
 > **Consequence:** reuse the base model's chat template and tool-call serialisation **byte for
 > byte**, and add a parser-conformance test as a release gate (§5).
 
+### M5.1 — The two layers: wire format vs. tool schema
+
+This is the distinction that most often gets confused, and getting it wrong turns a
+general-purpose coding model into a single-harness accessory. There are **two separate
+layers**, and only one of them is fixed at training time.
+
+| Layer | What it is | Where it lives | Baked into the weights? |
+|---|---|---|---|
+| **① Wire format** | *How* a tool call is serialised on the wire — `<tool_call>{"name":…,"arguments":{…}}</tool_call>` | The model's output, and the parser that reads it | **Yes — and it must match the base model's native format.** The base already emits it. We do not change it. |
+| **② Tool schema** | *Which* tools exist, and their JSON Schemas — `read_file`, `bash`, `apply_patch`… | **The request.** Every request, every call. | **No.** Supplied at runtime by whatever agent is driving. |
+
+**Layer ② is a request parameter.** It arrives in the prompt at runtime, and at training
+time it arrives as *varying input*:
+
+```
+Sample A:  <tools>[read_file(path,start_line), bash(cmd)]</tools>
+           → <tool_call>{"name":"read_file","arguments":{"path":"src/parser.py"}}</tool_call>
+
+Sample B:  <tools>[read(file_path), run_command(cmd)]</tools>
+           → <tool_call>{"name":"read","arguments":{"file_path":"src/parser.py"}}</tool_call>
+```
+
+Same behaviour, different tools. The weights learn **"given a schema in the prompt, emit a
+matching call"** — not *"emit a call to `read_file`"*.
+
+This is exactly what Qwen3-Coder-Next is described as doing: *"adaptability to various
+scaffold templates"* ✅ — it explicitly supports Claude Code, Qwen Code, Qoder, Kilo, Trae
+and Cline ✅.
+
+> 🎯 **The correct frame is: the wire format is fixed by the base model (one format, and it
+> is already correct). The tool schema is data, not architecture.**
+>
+> The one genuine coupling is at **serving** time: the parser must match the base's native
+> format. That is `vllm serve --enable-auto-tool-choice --tool-call-parser qwen3_coder` ✅
+> — one flag — and vLLM then translates the native format into standard structured
+> `tool_calls` in the response, which is what every OpenAI-compatible agent expects.
+
+**How we protect this:** the collector varies the tool schema across trajectories (the
+*tool-schema shuffler*, `src/collect/schema_tools.py`), so the model is forced to read the
+schema it was given rather than memorise a tool list. See `13-COLLECTOR-TOOLKIT.md` §4.
+
 ---
 
 ## 3. Two routes to "3B that behaves like 300B" — and we pick one

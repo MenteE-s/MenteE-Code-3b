@@ -25,6 +25,7 @@
 | **10** | [Roadmap & Backlog](10-ROADMAP-AND-BACKLOG.md) | Day-by-day, parallelisation, the critical path, P0/P1/P2 with acceptance criteria | Now, and every day after. |
 | **11** | [Risks & Fallbacks](11-RISKS-AND-OPEN-QUESTIONS.md) | Every risk with a trigger, a mitigation and a fallback | Now. Read R1 and R2 twice. |
 | **12** | [Open Questions](12-OPEN-QUESTIONS.md) | What was **not** verified, and the 10 assumptions with their resolution steps | Before making any public claim. |
+| **13** | [The Collector Toolkit](13-COLLECTOR-TOOLKIT.md) | The code: generate → validate → append, the append guarantees, the tool-schema shuffler | When you run the collector. |
 
 ---
 
@@ -40,6 +41,16 @@ no teacher-licence ambiguity.
 coding — and that five mechanisms make it happen. Three we inherit from the base model.
 Two, **execution-verified post-training** and **long-horizon recovery**, only our data can
 supply. 🎯 That is the whole project.
+
+**The two layers** (`01` §2.5) — the one that is most often confused:
+
+| Layer | Baked into the weights? |
+|---|---|
+| **① Wire format** (how a tool call is serialised) | **Yes** — it is the base model's native format, reused byte-for-byte |
+| **② Tool schema** (which tools exist, their parameters) | **No** — it is a request parameter, supplied by whatever agent is driving |
+
+So the model is **not** trained to one harness's tool names. It is trained to read the
+schema it is given. OpenCode is one adapter among several, not a dependency.
 
 **So: is more data + better data enough?** Mostly — but not alone:
 
