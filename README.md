@@ -1,0 +1,87 @@
+# MenteE Code 3B
+
+**A 3B-activated-parameter coding model for autonomous coding agents.**
+
+> MenteE Code 3B is a code-specialised language model that lives in an agent's terminal. It
+> investigates repositories, edits files, runs tests, recovers from failures, and reports
+> honestly whether the task succeeded. It is built for OpenCode and similar harnesses, and
+> served over a standard OpenAI-compatible API.
+
+**Status: planning / pre-data.** No training has been run. No benchmark results have been
+produced. Every external fact in the documentation was verified against a primary source on
+**2026-10-19**.
+
+---
+
+## What it is
+
+| | |
+|---|---|
+| **Base** | `Qwen/Qwen3-Coder-30B-A3B-Instruct` — 30.5B total / **3.3B active**, Apache-2.0 |
+| **Teacher** | `Qwen/Qwen3-Coder-Next` — 80B total / **3B active**, Apache-2.0, self-hosted |
+| **Method** | QLoRA supervised fine-tuning → rejection fine-tuning (RFT) on execution-verified trajectories |
+| **Serving** | vLLM, OpenAI-compatible `/v1/chat/completions`, AWQ Q4 on **one 24 GB GPU** |
+| **Moat** | Our own execution-verified agent trajectory dataset — the only thing here that is not a commodity |
+| **Cost** | ~$30 to prove the idea · ~$1,020 to ship v0.1 + a 10-day beta · **~$0.02 per successful task** |
+
+---
+
+## The thesis in one paragraph
+
+A 3B-activated Mixture-of-Experts model **can** behave like a 300B model on agentic coding —
+this is demonstrated, not hypothetical: `Qwen3-Coder-Next` activates 3B parameters per token
+and reports **70.6 on SWE-bench Verified** and **36.2 on Terminal-Bench 2.0** ✅. Five
+mechanisms make it happen: a sparse knowledge store (total ≫ active), cheap long-context
+attention, execution-verified post-training, long-horizon recovery training, and a native
+tool-call format. **We inherit the first, second and fifth from the base model. The third and
+fourth can only come from our data.** That is the entire project, and it is why the data
+pipeline matters more than the training script.
+
+Full argument: [`docs/01-THESIS-300B-CLASS.md`](docs/01-THESIS-300B-CLASS.md)
+
+---
+
+## Documentation
+
+Start at **[`docs/README.md`](docs/README.md)** for the index and the 60-second version.
+
+| | |
+|---|---|
+| [`00` Executive Summary](docs/00-EXECUTIVE-SUMMARY.md) | The direction, the five release gates, the kill switch |
+| [`01` The 300B-Class Thesis](docs/01-THESIS-300B-CLASS.md) | How a 3B model behaves like a 300B model |
+| [`02` Base Model Selection](docs/02-BASE-MODEL-SELECTION.md) | Candidate matrix, licences, training traps |
+| [`03` Architecture](docs/03-ARCHITECTURE.md) | Pipeline, components, the model-vs-runtime boundary |
+| [`04` Data Schema](docs/04-DATA-SCHEMA.md) | Canonical format, licence manifest, dedup, splits |
+| [`05` Data Collection Playbook](docs/05-DATA-COLLECTION-PLAYBOOK.md) | 🎯 **The weekend job** |
+| [`06` Training](docs/06-TRAINING.md) | Stage 0 → pilot → scale → RFT, with configs |
+| [`07` Evaluation](docs/07-EVALUATION.md) | The benchmark suite, G1–G5, contamination control |
+| [`08` Serving & Beta](docs/08-SERVING-AND-BETA.md) | vLLM, OpenCode, gateway, privacy, sandboxing |
+| [`09` Cost Model](docs/09-COST-MODEL.md) | Three estimates, verified prices, cost per task |
+| [`10` Roadmap & Backlog](docs/10-ROADMAP-AND-BACKLOG.md) | Day-by-day, critical path, P0/P1/P2 |
+| [`11` Risks & Fallbacks](docs/11-RISKS-AND-OPEN-QUESTIONS.md) | Every risk with trigger, mitigation, fallback |
+| [`12` Open Questions](docs/12-OPEN-QUESTIONS.md) | What was **not** verified |
+
+---
+
+## Repository layout
+
+```
+docs/      the documentation set (start here)
+schemas/   canonical JSON Schema for trajectories + the source registry
+```
+
+Code, configs and the data pipeline are not yet written — see
+[`docs/10-ROADMAP-AND-BACKLOG.md`](docs/10-ROADMAP-AND-BACKLOG.md) for the build order.
+
+---
+
+## Next action
+
+**[`docs/05-DATA-COLLECTION-PLAYBOOK.md`](docs/05-DATA-COLLECTION-PLAYBOOK.md) §7 — the weekend
+checklist.** The critical path is four steps: sandbox → 20 trajectories → 500 verified →
+pilot → gate.
+
+---
+
+*MenteE AI · menteeai.org · Apache-2.0 lineage. Model weights to be released under Apache-2.0
+with the base model's attribution retained, as required.*

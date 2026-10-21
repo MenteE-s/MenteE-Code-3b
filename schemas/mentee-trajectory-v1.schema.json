@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://menteeai.org/schemas/mentee-trajectory-v1.schema.json",
+  "title": "MenteE Code — Canonical Agent Trajectory (v1)",
+  "description": "One agent trajectory. Canonical interchange format is JSONL, one record per line.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "provenance",
+    "task",
+    "environment",
+    "trajectory",
+    "verification",
+    "quality",
+    "split"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of THIS record's schema."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^traj_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}$",
+      "description": "Unique trajectory id."
+    },
+
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_url",
+        "source_sha256",
+        "license",
+        "license_verified",
+        "redistributable",
+        "trainable",
+        "teacher",
+        "collected_at"
+      ],
+      "properties": {
+        "source_id": { "type": "string" },
+        "source_url": { "type": "string" },
+        "source_sha256": { "type": "string" },
+        "license": {
+          "type": "string",
+          "description": "SPDX id of the DATA licence, not the weights.",
+          "examples": ["Apache-2.0", "MIT", "OpenMDW-1.1", "CC-BY-4.0", "CC-BY-NC-4.0"]
+        },
+        "license_verified": {
+          "type": "boolean",
+          "description": "A licence check was actually performed against the source."
+        },
+        "redistributable": { "type": "boolean" },
+        "trainable": {
+          "type": "boolean",
+          "description": "SEPARATE from license. May we train a model on this? Many licences permit use but restrict training."
+        },
+        "teacher": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "revision", "license", "sampling"],
+          "properties": {
+            "model": { "type": "string" },
+            "revision": {
+              "type": "string",
+              "description": "Pinned commit/revision. 'main' moves and is not reproducible."
+            },
+            "license": { "type": "string" },
+            "sampling": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "temperature": { "type": "number" },
+                "top_p": { "type": "number" },
+                "top_k": { "type": "integer" },
+                "repetition_penalty": { "type": "number" }
+              }
+            },
+            "quantization": { "type": "string" },
+            "served_by": { "type": "string" }
+          }
+        },
+        "generator": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "code_version": { "type": "string" },
+            "prompt_template": { "type": "string" },
+            "harness": { "type": "string" }
+          }
+        },
+        "collected_at": { "type": "string", "format": "date-time" },
+        "collected_by": { "type": "string" }
+      }
+    },
+
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instruction", "language", "task_type"],
+      "properties": {
+        "instruction": { "type": "string", "minLength": 1 },
+        "issue_url": { "type": ["string", "null"] },
+        "language": {
+          "type": "string",
+          "description": "Primary language of the repository under edit."
+        },
+        "task_type": {
+          "type": "string",
+          "enum": [
+            "bug_fix",
+            "feature",
+            "refactor",
+            "test_authoring",
+            "doc",
+            "perf",
+            "build_fix",
+            "dependency_upgrade"
+          ]
+        },
+        "difficulty": { "type": "string", "enum": ["easy", "medium", "hard", "unlabelled"] },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+        "outcome": {
+          "type": "string",
+          "enum": ["solved", "failed", "failed_but_honest", "abandoned", "partial"],
+          "description": "failed_but_honest examples are KEPT — they train honest failure reporting."
+        }
+      }
+    },
+
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "base_commit", "test_command", "fail_to_pass"],
+      "properties": {
+        "repo": { "type": "string" },
+        "repo_license": { "type": ["string", "null"] },
+        "repo_url": { "type": ["string", "null"] },
+        "base_commit": {
+          "type": "string",
+          "description": "Exact commit sha. The repo moves; without this the task is unreproducible."
+        },
+        "setup_script": { "type": "string" },
+        "test_command": { "type": "string" },
+        "fail_to_pass": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tests that fail before the patch and pass after. This defines 'fixed'."
+        },
+        "pass_to_pass": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Regression set. All must still pass after the patch."
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "image": { "type": "string" },
+            "image_digest": { "type": ["string", "null"] },
+            "timeout_s": { "type": "integer" },
+            "network": { "type": "boolean" },
+            "cpu_limit": { "type": ["number", "null"] },
+            "memory_limit_mb": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+
+    "trajectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["turns", "n_turns", "stop_reason"],
+      "properties": {
+        "turns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/turn" }
+        },
+        "patches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "diff"],
+            "properties": {
+              "path": { "type": "string" },
+              "diff": {
+                "type": "string",
+                "description": "Unified diff. NOT the full file — this is the form the model must learn to emit."
+              },
+              "applied": { "type": "boolean" }
+            }
+          }
+        },
+        "n_turns": { "type": "integer", "minimum": 1 },
+        "stop_reason": {
+          "type": "string",
+          "enum": ["completed", "max_turns", "cancelled", "error", "budget_exhausted"]
+        },
+        "duration_s": { "type": ["number", "null"] },
+        "total_tokens": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input": { "type": "integer" },
+            "output": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "error", "skipped"],
+          "description": "Produced by the SANDBOX, never by the model. 'skipped' means unverified."
+        },
+        "verifier": { "type": "string" },
+        "verified_at": { "type": "string", "format": "date-time" },
+        "tests": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fail_to_pass": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "before": { "type": "string" },
+                "after": { "type": "string" }
+              }
+            },
+            "pass_to_pass": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "before": { "type": "string" },
+                "after": { "type": "string" },
+                "total": { "type": "integer" },
+                "regressed": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "regressions": { "type": "array", "items": { "type": "string" } },
+        "sandbox": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "image_digest": { "type": "string" },
+            "network": { "type": "boolean" },
+            "timeout_s": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "score", "checks"],
+      "properties": {
+        "verified": {
+          "type": "boolean",
+          "description": "True only if verification.status == 'pass' and no regressions."
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "schema_valid": { "type": "boolean" },
+            "no_truncated_tool_output": { "type": "boolean" },
+            "has_failure_path": {
+              "type": "boolean",
+              "description": "Contains at least one failed-then-recovered step. Target: >= 30% of the dataset."
+            },
+            "no_secrets": { "type": "boolean" },
+            "no_hallucinated_paths": { "type": "boolean" },
+            "patch_applies": { "type": "boolean" },
+            "regressions": { "type": "integer" },
+            "token_length_ok": { "type": "boolean" },
+            "dedup_cluster": { "type": ["string", "null"] }
+          }
+        },
+        "rejected_by": { "type": "array", "items": { "type": "string" } },
+        "filter_notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partition", "reason", "split_group"],
+      "properties": {
+        "partition": { "type": "string", "enum": ["train", "val", "test"] },
+        "reason": {
+          "type": "string",
+          "description": "Why this partition. e.g. 'commit_date_before_2026-07-01'."
+        },
+        "split_group": {
+          "type": "string",
+          "description": "Repo@commit group. ALL instances of a repo land in ONE partition."
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "turn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "role"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "role": {
+          "type": "string",
+          "enum": ["system", "user", "assistant", "tool_result"]
+        },
+        "content": { "type": "string" },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "arguments"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "arguments": {
+                "type": "object",
+                "description": "Parsed arguments (JSON object)."
+              },
+              "arguments_raw": {
+                "type": "string",
+                "description": "EXACT bytes the model emitted. Required for faithful re-tokenisation; re-serialising a parsed dict can reorder keys and shift the token sequence."
+              }
+            }
+          }
+        },
+        "tool_call_id": { "type": "string" },
+        "name": { "type": "string" },
+        "truncated": {
+          "type": "boolean",
+          "description": "True if this tool output was shortened. Truncated output teaches the model to hallucinate the remainder."
+        },
+        "content_bytes": { "type": "integer" }
+      }
+    }
+  }
+}

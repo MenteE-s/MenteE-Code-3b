@@ -1,0 +1,58 @@
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ── Model & dataset artefacts (large) ─────────────────────────────────────
+# Artefacts live outside the repo; only configs, manifests and reports are tracked.
+data/raw/
+data/processed/
+data/fetched/
+models/
+logs/
+artifacts/
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+*.ckpt
+*.parquet
+*.arrow
+
+# ── Secrets & keys (never commit) ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+credentials.json
+
+# ── Local config ──────────────────────────────────────────────────────────
+configs/local_*.yaml
+configs/local_*.json
+.opencode.json
+opencode.json
+
+# ── Eval & report scratch ─────────────────────────────────────────────────
+reports/*.tmp
+*.log
+!requirements*.txt
+
+# ── OS / editor ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ── Hugging Face cache ────────────────────────────────────────────────────
+.cache/
+huggingface/
+hf_cache/
