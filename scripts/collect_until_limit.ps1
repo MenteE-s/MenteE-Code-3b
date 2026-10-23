@@ -44,4 +44,3 @@ while ($true) {
     Start-Sleep -Seconds $SleepSeconds
 }
 Write-Host "Finished after $iter iterations."
-"

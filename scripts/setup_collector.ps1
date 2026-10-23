@@ -22,4 +22,3 @@ if ($LASTEXITCODE -ne 0) { throw "setup failed" }
 Write-Host ""
 Write-Host "Setup complete. Start collecting with:"
 Write-Host "    powershell -ExecutionPolicy Bypass -File scripts\collect_until_limit.ps1 -Collector $name"
-"
