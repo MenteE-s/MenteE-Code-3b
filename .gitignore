@@ -62,3 +62,6 @@ hf_cache/
 
 # advisory lock + sidecar runtime files (ephemeral)
 *.lock
+
+.venv312/
+datasets/collectors/*/debug-*.json

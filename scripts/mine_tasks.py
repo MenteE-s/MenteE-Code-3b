@@ -90,6 +90,20 @@ def git(repo: Path, *args: str, timeout: int = 120) -> tuple[int, str]:
     return run(["git", *args], cwd=repo, timeout=timeout)
 
 
+_DIFF_HEADER = re.compile(r"^diff --git a/(\S+) b/(\S+)$", re.M)
+
+
+def _is_test_path(path: str) -> bool:
+    p = path.lower()
+    return (
+        p.startswith("tests/")
+        or "/tests/" in p
+        or p.endswith("_test.py")
+        or p.startswith("test_")
+        or "/testing/" in p
+    )
+
+
 def is_test_file(path: str) -> bool:
     return bool(TEST_FILE_RE.search(path.replace("\\", "/"))) and path.endswith(".py")
 
@@ -135,6 +149,25 @@ def added_test_names(diff: str) -> list[str]:
             if test_id not in names:
                 names.append(test_id)
     return names
+
+
+def split_patch(gold: str) -> tuple[str, str]:
+    """Split a unified diff into (test part, source part)."""
+    if not gold.strip():
+        return "", ""
+    matches = list(_DIFF_HEADER.finditer(gold))
+    test_parts: list[str] = []
+    source_parts: list[str] = []
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(gold)
+        section = gold[start:end]
+        b_path = m.group(2).replace("\\", "/")
+        if _is_test_path(b_path):
+            test_parts.append(section)
+        else:
+            source_parts.append(section)
+    return "\n".join(test_parts), "\n".join(source_parts)
 
 
 def changed_files(repo: Path, sha: str) -> tuple[list[str], list[str]]:
@@ -267,11 +300,29 @@ def mine_repo(
                 _cleanup()
                 continue
 
-            # --- run the whole changed test files BEFORE the patch -----------
-            # This is the R2E-Gym approach and it is deliberately not based on
-            # parsing test names out of the diff: a fix often ADDS its regression
-            # test, so the "fail before" test does not exist at the base commit
-            # and no amount of correct test-ID parsing can find it.
+            # --- pre-apply the TEST patch at base ----------------------------
+            # The fix commit usually ADDS its own regression test. At base that
+            # test does not exist, so it cannot "flip" from failing to passing -
+            # and a fix whose bug had no prior test coverage would be wrongly
+            # rejected. Applying the test part first (SWE-bench method) makes the
+            # new test exist and genuinely fail before the source fix lands.
+            code, patch_full = git(repo, "diff", f"{sha}^", sha)
+            if code != 0 or not patch_full.strip():
+                stats.reject("no_patch")
+                _cleanup()
+                continue
+            test_part, source_part = split_patch(patch_full)
+            if test_part.strip():
+                tp = worktree / ".mente_test.patch"
+                tp.write_text(test_part, encoding="utf-8")
+                code_tp, _ = git(worktree, "apply", "--whitespace=nowarn", str(tp))
+                tp.unlink(missing_ok=True)
+                if code_tp != 0:
+                    stats.reject("test_patch_failed")
+                    _cleanup()
+                    continue
+
+            # --- run the whole changed test files BEFORE the source fix ------
             test_files = sorted(set(tests))
             code_before, out_before = run_tests(worktree, test_files, test_timeout)
             failed_before = _failed_tests(out_before)
@@ -280,34 +331,37 @@ def mine_repo(
                 _cleanup()
                 continue
 
-            # --- apply the gold patch ----------------------------------------
-            code, patch = git(repo, "diff", f"{sha}^", sha)
-            if code != 0 or not patch.strip():
-                stats.reject("no_patch")
-                continue
-            patch_file.write_text(patch, encoding="utf-8")
-            code_apply, apply_out = git(worktree, "apply", "--whitespace=nowarn", str(patch_file))
+            # --- apply the SOURCE part of the fix ----------------------------
+            if source_part.strip():
+                sp = worktree / ".mente_src.patch"
+                sp.write_text(source_part, encoding="utf-8")
+                code_apply, _ = git(worktree, "apply", "--whitespace=nowarn", str(sp))
+                sp.unlink(missing_ok=True)
+            else:
+                code_apply, _ = git(worktree, "apply", "--whitespace=nowarn", "-")
             if code_apply != 0:
                 stats.reject("patch_does_not_apply")
                 _cleanup()
                 continue
 
             # --- run the same test files AFTER the patch ----------------------
+            # Judge by *flips*, not by whether the whole file passes: an unrelated
+            # pre-existing failure must not discard a task whose target test
+            # genuinely flipped from failing to passing.
             code_after, out_after = run_tests(worktree, test_files, test_timeout)
-            if code_after != 0:
-                stats.reject("tests_still_fail")
-                stats.last_failure = out_after[-500:]
-                _cleanup()
-                continue
-
             failed_after = _failed_tests(out_after)
             fail_to_pass = sorted(failed_before - failed_after)
+            regressions = sorted(failed_after - failed_before)
             if not fail_to_pass:
                 stats.reject("no_test_flipped")
                 stats.last_failure = out_after[-500:]
                 _cleanup()
                 continue
-            regressed = len(failed_after - failed_before)
+            if regressions:
+                stats.reject(f"regressions:{len(regressions)}")
+                _cleanup()
+                continue
+            regressed = len(regressions)
 
             body_lines = _commit_body(repo, sha)
             instruction = _instruction_from(subject, body_lines, fail_to_pass)
@@ -326,7 +380,9 @@ def mine_repo(
                 "setup_script": _setup_hint(worktree),
                 "test_command": f"{sys.executable} -m pytest -q",
                 "fail_to_pass": fail_to_pass,
-                "gold_patch": patch,
+                "gold_patch": patch_full,
+                "test_patch": test_part,
+                "source_patch": source_part,
                 "verified": True,
                 "verification": {
                     "tests_failed_before": len(failed_before),

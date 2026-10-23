@@ -226,6 +226,14 @@
           "enum": ["pass", "fail", "error", "skipped"],
           "description": "Produced by the SANDBOX, never by the model. 'skipped' means unverified."
         },
+        "method": {
+          "type": "string",
+          "description": "How this was verified: 'sandbox' (independent re-run), 'agent_run_tests' (the agent ran the tests in-loop), 'not_run'."
+        },
+        "detail": {
+          "type": "string",
+          "description": "Short evidence excerpt, e.g. the tail of the test output."
+        },
         "verifier": { "type": "string" },
         "verified_at": { "type": "string", "format": "date-time" },
         "tests": {

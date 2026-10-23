@@ -1,0 +1,14 @@
+{
+  "task_id": "mine_more-itertools_67fcf640",
+  "instruction": "In this Python repository, bucket() does not honour a falsey validator: when the validator callable is falsey (e.g. an empty set subclass used as a membership check), bucket() replaces it with the default validator instead of using it. The failing test is tests/test_more.py::BucketTests::test_falsey_validator_is_honoured - it is already applied to the working tree. Find the bucket() implementation in more_itertools/more.py, fix it so a falsey validator is honoured, and verify with run_tests.",
+  "repo": "more-itertools",
+  "base_commit": "1ea82a711c69f590054987b5cb194157f8ce8ac4",
+  "workdir": "F:\\code\\mentee-code-3b\\data\\workdirs\\seed_bucket",
+  "test_command": "python -m pytest -q tests/test_more.py::BucketTests",
+  "fail_to_pass": [
+    "tests/test_more.py::BucketTests::test_falsey_validator_is_honoured"
+  ],
+  "language": "python",
+  "task_type": "bug_fix",
+  "difficulty": "medium"
+}

@@ -61,9 +61,56 @@ def _load_sidecar(path: Path) -> Sidecar:
 
 
 def _build_source(cfg: dict[str, Any], dry_run: bool):
+    from .agent import AgentConfig, AgentRunner, ToolExecutor
+
     src_cfg = cfg["source"]
     kind = src_cfg.get("kind", "harness")
     generator = dict(src_cfg.get("generator", {}) or {})
+
+    if kind == "agent":
+        # live agent loop against any OpenAI-compatible endpoint
+        # (OpenRouter, DeepSeek direct, a local vLLM)
+        acfg = src_cfg.get("agent", {}) or {}
+        teacher = src_cfg.get("teacher", {}) or {}
+        api_key = os.environ.get(acfg.get("api_key_env", "OPENROUTER_API_KEY"), "")
+        if not api_key:
+            raise SystemExit(
+                f"source.kind=agent needs {acfg.get('api_key_env', 'OPENROUTER_API_KEY')} in the environment"
+            )
+        runner = AgentRunner(
+            AgentConfig(
+                base_url=acfg.get("base_url", "https://openrouter.ai/api/v1"),
+                api_key=api_key,
+                model=acfg.get("model", "cohere/north-mini-code:free"),
+                temperature=float(teacher.get("sampling", {}).get("temperature", 0.7)),
+                top_p=float(teacher.get("sampling", {}).get("top_p", 0.95)),
+                max_turns=int(acfg.get("max_turns", 25)),
+            ),
+            ToolExecutor("."),  # replaced per-task inside run()
+        )
+        tasks = load_tasks(src_cfg["tasks_path"])
+        if dry_run:
+            tasks = tasks[:1]
+        generator.setdefault("harness", "mente-agent")
+        generator["teacher"] = {
+            "model": acfg.get("model", ""),
+            "revision": teacher.get("revision", "unknown"),
+            "license": teacher.get("license", "provider terms"),
+            "sampling": teacher.get("sampling", {}),
+        }
+        generator["arguments_raw_source"] = "raw_response"
+
+        class AgentTrajectorySource:
+            def __iter__(self):
+                for t in tasks:
+                    started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                    raw, meta = runner.run(t.to_record_task() | {"workdir": t.workdir})
+                    raw.task.update(meta)
+                    raw.started_at = started
+                    raw.generator.update(generator)
+                    yield raw
+
+        return AgentTrajectorySource()
 
     if kind == "replay":
         replay_path = src_cfg.get("replay", {}).get("path", "")
