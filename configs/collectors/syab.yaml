@@ -51,6 +51,7 @@ source:
     api_key_env: OPENROUTER_API_KEY
     model: nvidia/nemotron-3-ultra-550b-a55b:free
     max_turns: 20
+    samples_per_task: 10
 output:
   path: datasets/collectors/syab/train.jsonl
   rejected_path: datasets/collectors/syab/rejected.jsonl

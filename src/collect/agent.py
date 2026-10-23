@@ -456,7 +456,7 @@ class AgentRunner:
             )
             try:
                 with urllib.request.urlopen(req, timeout=self.cfg.request_timeout_s) as resp:
-                    return json.loads(resp.read().decode("utf-8"))
+                    payload = json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as exc:
                 last = f"HTTP {exc.code}: {exc.read().decode(errors='replace')[:300]}"
                 retry_after = exc.headers.get("Retry-After")
@@ -471,8 +471,23 @@ class AgentRunner:
             except (urllib.error.URLError, TimeoutError) as exc:
                 last = f"{type(exc).__name__}: {exc}"
                 time.sleep(min(30.0, (2**attempt) * 2))
+                continue
+            # A 200 response can still carry an error object (overloaded free
+            # provider, upstream timeout). Treat it as a retryable provider
+            # error instead of letting a KeyError('choices') kill the run.
+            if not isinstance(payload, dict) or not payload.get("choices"):
+                detail = ""
+                if isinstance(payload, dict):
+                    err = payload.get("error") or payload
+                    if isinstance(err, dict):
+                        detail = str(err.get("message") or err.get("code") or err)[:300]
+                    else:
+                        detail = str(err)[:300]
+                last = f"provider returned no choices: {detail or 'empty response'}"
+                time.sleep(min(20.0, (2**attempt) * 2 + random.random() * 2))
+                continue
+            return payload
         raise RuntimeError(f"request failed after {self.cfg.max_retries} attempts: {last}")
-
     # ------------------------------------------------------------------ loop
     def run(self, task: dict[str, Any]) -> tuple[RawTrajectory, dict[str, Any]]:
         """Run the agent on one task. Returns (raw_trajectory, run_metadata)."""

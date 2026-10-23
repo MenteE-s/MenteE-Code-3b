@@ -102,16 +102,21 @@ class Sidecar:
             self._ids_fh.flush()
 
     # ------------------------------------------------------------------ tasks
+    def task_count(self, task_id: str) -> int:
+        return int(self.data.get("task_counts", {}).get(task_id, 0) or 0)
+
     def has_task(self, task_id: str) -> bool:
-        return bool(task_id) and task_id in self._done_tasks
+        return self.task_count(task_id) > 0
 
     def add_task(self, task_id: str) -> None:
-        if not task_id or task_id in self._done_tasks:
+        if not task_id:
             return
+        counts = self.data.setdefault("task_counts", {})
+        counts[task_id] = int(counts.get(task_id, 0) or 0) + 1
+        done = self.data.setdefault("done_task_ids", [])
+        if task_id not in done:
+            done.append(task_id)
         self._done_tasks.add(task_id)
-        self.data.setdefault("done_task_ids", [])
-        if task_id not in self.data["done_task_ids"]:
-            self.data["done_task_ids"].append(task_id)
         # persist immediately so a restart skips it
         self.save()
 
@@ -139,9 +144,11 @@ class Sidecar:
             task_id = task.get("task_id")
             if task_id:
                 self._done_tasks.add(task_id)
-                self.data.setdefault("done_task_ids", [])
-                if task_id not in self.data["done_task_ids"]:
-                    self.data["done_task_ids"].append(task_id)
+                done = self.data.setdefault("done_task_ids", [])
+                if task_id not in done:
+                    done.append(task_id)
+                counts = self.data.setdefault("task_counts", {})
+                counts[task_id] = int(counts.get(task_id, 0) or 0) + 1
         self.data["next_seq"] = max_seq
 
     def set_run(self, run_id: str, extra: dict | None = None) -> None:

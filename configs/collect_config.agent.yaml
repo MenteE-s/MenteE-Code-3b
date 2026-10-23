@@ -27,6 +27,11 @@ source:
     #   api_key_env: DEEPSEEK_API_KEY
     #   model: deepseek-flash
     max_turns: 20
+    # how many accepted trajectories to collect per task. The same bug is
+    # sampled several times (different model sampling) and only the attempts
+    # that actually solve it are kept - this is what turns 4 tasks into a
+    # usable training set.
+    samples_per_task: 10
 
   teacher:
     model: nvidia/nemotron-3-ultra-550b-a55b:free

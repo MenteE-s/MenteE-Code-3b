@@ -86,7 +86,13 @@ def _load_sidecar(path: Path) -> Sidecar:
     return Sidecar(path).load()
 
 
-def _build_source(cfg: dict[str, Any], dry_run: bool, skip_task_ids: set[str] | None = None):
+def _build_source(
+    cfg: dict[str, Any],
+    dry_run: bool,
+    skip_task_ids: set[str] | None = None,
+    task_counts: dict[str, int] | None = None,
+    samples_per_task: int = 1,
+):
     from .agent import AgentConfig, AgentRunner, ToolExecutor
 
     src_cfg = cfg["source"]
@@ -115,8 +121,16 @@ def _build_source(cfg: dict[str, Any], dry_run: bool, skip_task_ids: set[str] | 
             ToolExecutor("."),  # replaced per-task inside run()
         )
         skip = skip_task_ids or set()
+        counts = task_counts or {}
         tasks = load_tasks(src_cfg["tasks_path"])
-        tasks = [t for t in tasks if t.task_id not in skip]
+        # a task is finished only after it has produced `samples_per_task`
+        # accepted trajectories - the same bug can be sampled several times
+        # and only the successful attempts are kept
+        tasks = [
+            t for t in tasks
+            if t.task_id not in skip
+            or int(counts.get(t.task_id, 0) or 0) < int(samples_per_task)
+        ]
         if dry_run:
             tasks = tasks[:1]
         generator.setdefault("harness", "mente-agent")
@@ -147,6 +161,12 @@ def _build_source(cfg: dict[str, Any], dry_run: bool, skip_task_ids: set[str] | 
         return ReplaySource(replay_path, generator=generator)
 
     tasks = load_tasks(src_cfg["tasks_path"])
+    counts = task_counts or {}
+    tasks = [
+        t for t in tasks
+        if t.task_id not in (skip_task_ids or set())
+        or int(counts.get(t.task_id, 0) or 0) < int(samples_per_task)
+    ]
     if dry_run:
         tasks = tasks[:1]
 
@@ -246,7 +266,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     reporter = Reporter(run_id=sidecar.run_id or f"run-{int(time.time())}")
     sidecar.set_run(reporter.run_id, {"config": str(args.config) if args.config else None})
 
-    source = _build_source(cfg, args.dry_run, skip_task_ids=set(sidecar.data.get("done_task_ids", []) or []))
+    samples_per_task = int(
+        (cfg.get("source", {}).get("agent", {}) or {}).get("samples_per_task", 1)
+        or cfg.get("collection", {}).get("samples_per_task", 1)
+        or 1
+    )
+    source = _build_source(
+        cfg,
+        args.dry_run,
+        skip_task_ids=set(sidecar.data.get("done_task_ids", []) or []),
+        task_counts=dict(sidecar.data.get("task_counts", {}) or {}),
+        samples_per_task=samples_per_task,
+    )
 
     appender = JsonlAppender(out_path, fsync_every=int(out_cfg.get("fsync_every", 10)))
     rejected_appender = JsonlAppender(rejected_path, fsync_every=10)
@@ -271,14 +302,21 @@ def cmd_run(args: argparse.Namespace) -> int:
     print("")
 
     provider_limit_hit = False
+    provider_error_text = ""
     try:
         for raw in source:
             reporter.generated += 1
             task_id = str(raw.task.get("task_id") or raw.task.get("issue_url") or reporter.generated)
             if (raw.task.get("stop_reason") == "error"):
                 err = str(raw.task.get("provider_error") or "")
-                if any(k in err.lower() for k in ("429", "rate", "limit", "quota")):
+                if err:
+                    # the provider itself failed (rate limit, overload, outage).
+                    # Every remaining task would fail the same way, so stop and
+                    # let the run script restart later.
                     provider_limit_hit = True
+                    provider_error_text = err
+                    print(f"  provider error: {err[:200]}", file=sys.stderr)
+                    break
 
             record, problems = build_record(raw, _record_id(sidecar, collector_id))
             if collector_id:
@@ -415,7 +453,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         sidecar.close()
 
     if provider_limit_hit:
-        print("  provider rate limit reached - stopping (restart later)", file=sys.stderr)
+        print(f"  provider error - stopping (restart later): {provider_error_text[:200]}", file=sys.stderr)
         return 3
 
     # --- final verification --------------------------------------------------

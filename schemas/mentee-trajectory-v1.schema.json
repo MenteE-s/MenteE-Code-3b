@@ -104,6 +104,10 @@
       "additionalProperties": false,
       "required": ["instruction", "language", "task_type"],
       "properties": {
+        "task_id": {
+          "type": "string",
+          "description": "Stable id of the mined task this trajectory attempts. Links the row back to the task pool."
+        },
         "instruction": { "type": "string", "minLength": 1 },
         "issue_url": { "type": ["string", "null"] },
         "language": {
