@@ -2,9 +2,9 @@ collector:
   id: syab
   output_root: datasets/collectors
 source:
-  kind: harness
+  kind: agent
   harness: opencode
-  tasks_path: data/tasks/tasks.jsonl
+  tasks_path: data/tasks/prepared-syab.jsonl
   opencode:
     server_url: http://127.0.0.1:4096
     auth_user: opencode
@@ -15,12 +15,12 @@ source:
   replay:
     path: ''
   teacher:
-    model: Qwen/Qwen3-Coder-Next
-    revision: main
-    license: Apache-2.0
+    model: nvidia/nemotron-3-ultra-550b-a55b:free
+    revision: free
+    license: NVIDIA-Open-Model-License
     base_url: http://127.0.0.1:8000/v1
     sampling:
-      temperature: 1.0
+      temperature: 0.7
       top_p: 0.95
       top_k: 40
   proxy:
@@ -29,16 +29,16 @@ source:
     listen_port: 8010
     log_dir: data/raw/proxy_logs
   generator:
-    source_id: mentee_synth_v1
-    source_url: internal
+    source_id: mente_synth_v1
+    source_url: https://openrouter.ai/api/v1
     source_sha256: ''
-    license: Apache-2.0
+    license: NVIDIA-Open-Model-License
     license_verified: true
     redistributable: true
     trainable: true
-    collected_by: collector
+    collected_by: ''
     code_version: ''
-    prompt_template: ''
+    prompt_template: mente_agent_v1
   tool_schema_shuffle:
     enabled: true
     probability: 0.35
@@ -46,32 +46,36 @@ source:
     rename_params_probability: 0.7
     drop_probability: 0.25
     add_probability: 0.35
+  agent:
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: nvidia/nemotron-3-ultra-550b-a55b:free
+    max_turns: 20
 output:
   path: datasets/collectors/syab/train.jsonl
   rejected_path: datasets/collectors/syab/rejected.jsonl
-  fsync_every: 10
+  fsync_every: 5
   resume: true
 validation:
   schema_path: schemas/mentee-trajectory-v1.schema.json
-  tier_b_sample_rate: 0.02
+  tier_b_sample_rate: 0.0
   tier_b_timeout_s: 900
   require_verified: false
   min_chars: 400
   max_chars: 400000
-  max_identical_tool_calls: 3
+  max_identical_tool_calls: 4
 integrity:
   enabled: true
-  first_check_at: 10
+  first_check_at: 5
   gaps:
+  - 10
+  - 20
   - 30
-  - 45
-  - 60
-  - 90
-  steady_every: 200
+  steady_every: 50
   jitter_ratio: 0.3
   full_rescan_every: 5
   on_failure: abort
 budget:
   max_rows: null
-  max_minutes: null
+  max_minutes: 55
   max_generation_tokens: null
