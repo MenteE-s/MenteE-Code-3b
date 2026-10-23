@@ -45,7 +45,7 @@ def serve():
     volumes={MODEL_PATH: model_volume},
     timeout=600,
 )
-def download_model(repo_id: str = "MenteE-s/MenteE-Code-3B"):
+def download_model(repo_id: str = "MenteEAI/MenteE-Code-3B"):
     """Download model from HuggingFace to the Modal volume."""
     from huggingface_hub import snapshot_download
     snapshot_download(repo_id, local_dir=MODEL_PATH)

@@ -1,11 +1,23 @@
 {
   "run_id": "run-1792755779",
-  "started_at": "2026-10-23T11:42:59Z",
-  "config": "configs/collect_config.agent.yaml",
-  "next_seq": 2,
-  "lines": 3,
-  "bytes": 85338,
-  "checkpointed_at": "2026-10-23T11:45:23Z",
+  "started_at": "2026-10-23T18:09:16Z",
+  "config": "configs\\collectors\\syab.yaml",
+  "next_seq": 39,
+  "lines": 16,
+  "bytes": 422956,
+  "checkpointed_at": "2026-10-23T18:13:15Z",
   "rejections": {},
-  "done_task_ids": []
+  "done_task_ids": [
+    "mine_more-itertools_6b1907de",
+    "mine_more-itertools_d992be0d",
+    "mine_more-itertools_cca32949",
+    "mine_more-itertools_cd0a3a87"
+  ],
+  "task_counts": {
+    "mine_more-itertools_6b1907de": 52,
+    "mine_more-itertools_d992be0d": 50,
+    "mine_more-itertools_cca32949": 34,
+    "mine_more-itertools_cd0a3a87": 6
+  },
+  "last_id": "traj_syab_2026-10-23_000034"
 }

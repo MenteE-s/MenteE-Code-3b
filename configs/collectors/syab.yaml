@@ -9,11 +9,11 @@ source:
     server_url: http://127.0.0.1:4096
     auth_user: opencode
     auth_password_env: OPENCODE_SERVER_PASSWORD
-    model: ''
-    agent: ''
+    model: ""
+    agent: ""
     timeout_s: 1800
   replay:
-    path: ''
+    path: ""
   teacher:
     model: nvidia/nemotron-3-ultra-550b-a55b:free
     revision: free
@@ -31,13 +31,13 @@ source:
   generator:
     source_id: mente_synth_v1
     source_url: https://openrouter.ai/api/v1
-    source_sha256: ''
+    source_sha256: ""
     license: NVIDIA-Open-Model-License
     license_verified: true
     redistributable: true
     trainable: true
-    collected_by: ''
-    code_version: ''
+    collected_by: ""
+    code_version: ""
     prompt_template: mente_agent_v1
   tool_schema_shuffle:
     enabled: true
@@ -50,7 +50,7 @@ source:
     base_url: https://openrouter.ai/api/v1
     api_key_env: OPENROUTER_API_KEY
     model: nvidia/nemotron-3-ultra-550b-a55b:free
-    max_turns: 20
+    max_turns: 24
     samples_per_task: 10
 output:
   path: datasets/collectors/syab/train.jsonl
@@ -69,9 +69,9 @@ integrity:
   enabled: true
   first_check_at: 5
   gaps:
-  - 10
-  - 20
-  - 30
+    - 10
+    - 20
+    - 30
   steady_every: 50
   jitter_ratio: 0.3
   full_rescan_every: 5

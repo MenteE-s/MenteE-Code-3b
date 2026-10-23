@@ -1,29 +1,25 @@
 {
   "run_id": "run-1792755779",
-  "elapsed_s": 144.0,
+  "elapsed_s": 286.3,
   "generated": 1,
-  "accepted": 1,
-  "rejected": 0,
+  "accepted": 0,
+  "rejected": 1,
   "skipped": 0,
-  "acceptance_rate": 1.0,
+  "acceptance_rate": 0.0,
   "deep_checked": 0,
   "integrity_checks": 1,
-  "integrity_failures": 1,
-  "verification_status": {
-    "fail": 1
-  },
+  "integrity_failures": 0,
+  "verification_status": {},
   "verified_rate": 0.0,
   "failure_path_rate": 0.0,
-  "mean_turns": 40.0,
-  "max_turns": 40,
-  "mean_tokens": 90715.0,
-  "rejections_by_check": {},
-  "rejection_examples": {},
-  "events": [
-    {
-      "at": "14:45:23",
-      "kind": "budget",
-      "detail": "stopped: max_rows"
-    }
-  ]
+  "mean_turns": 0.0,
+  "max_turns": 0,
+  "mean_tokens": 0.0,
+  "rejections_by_check": {
+    "no_tool_loop": 1
+  },
+  "rejection_examples": {
+    "no_tool_loop: identical tool call repeated 8 times (limit 4)": 1
+  },
+  "events": []
 }

@@ -1,0 +1,19 @@
+{
+  "run_id": "run-1792777803",
+  "started_at": "2026-10-23T18:12:37Z",
+  "config": "configs\\collectors\\syab-w3.yaml",
+  "next_seq": 7,
+  "task_counts": {
+    "mine_more-itertools_6b1907de": 26,
+    "mine_more-itertools_d992be0d": 9
+  },
+  "done_task_ids": [
+    "mine_more-itertools_6b1907de",
+    "mine_more-itertools_d992be0d"
+  ],
+  "lines": 7,
+  "bytes": 129164,
+  "checkpointed_at": "2026-10-23T18:14:59Z",
+  "rejections": {},
+  "last_id": "traj_syab-w3_2026-10-23_000006"
+}

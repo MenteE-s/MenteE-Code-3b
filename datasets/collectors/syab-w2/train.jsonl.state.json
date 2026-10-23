@@ -1,0 +1,21 @@
+{
+  "run_id": "run-1792777677",
+  "started_at": "2026-10-23T18:12:26Z",
+  "config": "configs\\collectors\\syab-w2.yaml",
+  "next_seq": 9,
+  "task_counts": {
+    "mine_more-itertools_6b1907de": 34,
+    "mine_more-itertools_d992be0d": 18,
+    "mine_more-itertools_cca32949": 2
+  },
+  "done_task_ids": [
+    "mine_more-itertools_6b1907de",
+    "mine_more-itertools_d992be0d",
+    "mine_more-itertools_cca32949"
+  ],
+  "lines": 9,
+  "bytes": 203432,
+  "checkpointed_at": "2026-10-23T18:14:48Z",
+  "rejections": {},
+  "last_id": "traj_syab-w2_2026-10-23_000008"
+}

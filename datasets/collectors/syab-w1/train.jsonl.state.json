@@ -1,0 +1,10 @@
+{
+  "run_id": "run-1792779357",
+  "started_at": "2026-10-23T18:20:30Z",
+  "config": "configs\\collectors\\syab-w1.yaml",
+  "lines": 0,
+  "bytes": 0,
+  "checkpointed_at": "2026-10-23T18:22:46Z",
+  "rejections": {},
+  "next_seq": 0
+}

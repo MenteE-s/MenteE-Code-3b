@@ -1,6 +1,6 @@
 """Upload a trained model to HuggingFace Hub (private).
 
-    python scripts/upload_model.py --model-dir outputs/full_run --repo MenteE-s/MenteE-Code-3B
+    python scripts/upload_model.py --model-dir outputs/full_run --repo MenteEAI/MenteE-Code-3B
 
 Requires: pip install huggingface_hub
 Set HF_TOKEN env var or run: huggingface-cli login
@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[1]
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True)
-    ap.add_argument("--repo", required=True, help="HuggingFace repo id, e.g. MenteE-s/MenteE-Code-3B")
+    ap.add_argument("--repo", required=True, help="HuggingFace repo id, e.g. MenteEAI/MenteE-Code-3B")
     ap.add_argument("--private", action="store_true", default=True)
     args = ap.parse_args()
 

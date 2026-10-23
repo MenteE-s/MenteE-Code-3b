@@ -4,9 +4,9 @@
 
 | What | Repo name | Type |
 |------|-----------|------|
-| **Model** | `MenteE-s/MenteE-Code-3B` | Model (private) |
-| **Dataset** | `MenteE-s/MenteE-Code-3B-Dataset` | Dataset (private) |
-| **GGUF (for Ollama)** | `MenteE-s/MenteE-Code-3B-GGUF` | Model (private) |
+| **Model** | `MenteEAI/MenteE-Code-3B` | Model (private) |
+| **Dataset** | `MenteEAI/MenteE-Code-3B-Dataset` | Dataset (private) |
+| **GGUF (for Ollama)** | `MenteEAI/MenteE-Code-3B-GGUF` | Model (private) |
 
 Create them at: https://huggingface.co/new (select "Model" or "Dataset", check "Private")
 
@@ -22,7 +22,7 @@ SSH into the instance
 
 ### 1.2 Install dependencies
 ```bash
-git clone https://github.com/MenteE-s/MenteE-Code-3b.git
+git clone https://github.com/MenteEAI/MenteE-Code-3b.git
 cd MenteE-Code-3b
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-train.txt
@@ -102,17 +102,17 @@ du -sh outputs/full_run/  # should be ~6GB
 
 ### 4.1 Upload the model
 ```bash
-python scripts/upload_model.py --model-dir outputs/full_run --repo MenteE-s/MenteE-Code-3B
+python scripts/upload_model.py --model-dir outputs/full_run --repo MenteEAI/MenteE-Code-3B
 ```
 
 ### 4.2 Upload the dataset (optional but recommended)
 ```bash
-huggingface-cli upload MenteE-s/MenteE-Code-3B-Dataset data/training/train.jsonl train.jsonl
+huggingface-cli upload MenteEAI/MenteE-Code-3B-Dataset data/training/train.jsonl train.jsonl
 ```
 
 ### 4.3 Verify on HuggingFace
 ```
-https://huggingface.co/MenteE-s/MenteE-Code-3B
+https://huggingface.co/MenteEAI/MenteE-Code-3B
 ```
 
 ---
@@ -162,7 +162,7 @@ Example: https://your-username--mentee-code-3b-serve.modal.run
 
 ### 7.1 Run logging proxy
 ```bash
-python scripts/log_proxy.py --backend https://your-modal-endpoint/v1 --port 8080 --push-hf MenteE-s/MenteE-Code-3B-Dataset
+python scripts/log_proxy.py --backend https://your-modal-endpoint/v1 --port 8080 --push-hf MenteEAI/MenteE-Code-3B-Dataset
 ```
 
 ### 7.2 Users connect via proxy
@@ -197,7 +197,7 @@ python scripts/download_datasets.py --out data/external --max-rows 25000 && pyth
 
 ### Upload
 ```bash
-python scripts/upload_model.py --model-dir outputs/full_run --repo MenteE-s/MenteE-Code-3B
+python scripts/upload_model.py --model-dir outputs/full_run --repo MenteEAI/MenteE-Code-3B
 ```
 
 ---

@@ -1,0 +1,82 @@
+collector:
+  id: syab-w3
+  output_root: datasets/collectors
+source:
+  kind: agent
+  harness: opencode
+  tasks_path: data/tasks/prepared-syab-w3.jsonl
+  opencode:
+    server_url: http://127.0.0.1:4096
+    auth_user: opencode
+    auth_password_env: OPENCODE_SERVER_PASSWORD
+    model: ''
+    agent: ''
+    timeout_s: 1800
+  replay:
+    path: ''
+  teacher:
+    model: nvidia/nemotron-3-ultra-550b-a55b:free
+    revision: free
+    license: NVIDIA-Open-Model-License
+    base_url: http://127.0.0.1:8000/v1
+    sampling:
+      temperature: 0.7
+      top_p: 0.95
+      top_k: 40
+  proxy:
+    enabled: false
+    listen_host: 127.0.0.1
+    listen_port: 8010
+    log_dir: data/raw/proxy_logs
+  generator:
+    source_id: mente_synth_v1
+    source_url: https://openrouter.ai/api/v1
+    source_sha256: ''
+    license: NVIDIA-Open-Model-License
+    license_verified: true
+    redistributable: true
+    trainable: true
+    collected_by: ''
+    code_version: ''
+    prompt_template: mente_agent_v1
+  tool_schema_shuffle:
+    enabled: true
+    probability: 0.35
+    rename_probability: 0.8
+    rename_params_probability: 0.7
+    drop_probability: 0.25
+    add_probability: 0.35
+  agent:
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: nvidia/nemotron-3-ultra-550b-a55b:free
+    max_turns: 20
+    samples_per_task: 10
+output:
+  path: datasets/collectors/syab-w3/train.jsonl
+  rejected_path: datasets/collectors/syab-w3/rejected.jsonl
+  fsync_every: 5
+  resume: true
+validation:
+  schema_path: schemas/mentee-trajectory-v1.schema.json
+  tier_b_sample_rate: 0.0
+  tier_b_timeout_s: 900
+  require_verified: false
+  min_chars: 400
+  max_chars: 400000
+  max_identical_tool_calls: 4
+integrity:
+  enabled: true
+  first_check_at: 5
+  gaps:
+  - 10
+  - 20
+  - 30
+  steady_every: 50
+  jitter_ratio: 0.3
+  full_rescan_every: 5
+  on_failure: abort
+budget:
+  max_rows: null
+  max_minutes: 55
+  max_generation_tokens: null

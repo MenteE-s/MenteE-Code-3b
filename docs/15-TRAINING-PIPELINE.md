@@ -42,15 +42,15 @@ python -m src.collect merge --inputs data/external/prepared.jsonl datasets/colle
 python scripts/benchmark.py --model outputs/full_run --tasks 50
 
 # 6. upload to HuggingFace (private)
-python scripts/upload_model.py --model-dir outputs/full_run --repo MenteE-s/MenteE-Code-3B
+python scripts/upload_model.py --model-dir outputs/full_run --repo MenteEAI/MenteE-Code-3B
 ```
 
 ## Where to save the model
 
 **HuggingFace Hub (private)** — recommended. Free, versioned, easy to download.
-- Create a private repo: `MenteE-s/MenteE-Code-3B`
+- Create a private repo: `MenteEAI/MenteE-Code-3B`
 - Upload with `scripts/upload_model.py`
-- Download on any machine with: `huggingface-cli download MenteE-s/MenteE-Code-3B`
+- Download on any machine with: `huggingface-cli download MenteEAI/MenteE-Code-3B`
 
 ## Where to run inference (cheap/free)
 
