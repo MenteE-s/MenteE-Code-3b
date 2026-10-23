@@ -82,6 +82,80 @@ def _slug(value: str) -> str:
     return cleaned.strip("-_")
 
 
+def _heal_duplicate_ids(path: Path, sidecar: Sidecar) -> int:
+    """One-time self-heal for a train.jsonl that contains duplicate ids.
+
+    This happens when sidecar state was lost (e.g. a recovered row was appended
+    without persisting the sidecar). The integrity checker then fails on every
+    run and the collector can never make progress. The heal KEEPS every row and
+    only renumbers the colliding ids, so no data is lost. Idempotent: returns 0
+    when the file is already clean. Only rewrites when corruption is detected.
+    """
+    if not path.is_file():
+        return 0
+    lines = path.read_text(encoding="utf-8").splitlines()
+    rows = [json.loads(l) for l in lines if l.strip()]
+    if not rows:
+        return 0
+    seen: set[str] = set()
+    dupes = []
+    for r in rows:
+        tid = str(r.get("id") or "")
+        if tid in seen:
+            dupes.append(r)
+        seen.add(tid)
+    if not dupes:
+        return 0
+    max_seq = 0
+    for r in rows:
+        m = re.search(r"_(\d{6})$", str(r.get("id") or ""))
+        if m:
+            max_seq = max(max_seq, int(m.group(1)))
+    # renumber colliding rows
+    seen2: set[str] = set()
+    for r in rows:
+        tid = str(r.get("id") or "")
+        if tid in seen2:
+            max_seq += 1
+            new_id = re.sub(r"_\d{6}$", f"_{max_seq:06d}", tid)
+            if new_id == tid:
+                new_id = f"{tid}_{max_seq:06d}"
+            print(f"  ! healing duplicate id {tid} -> {new_id}", file=sys.stderr)
+            r["id"] = new_id
+        seen2.add(str(r.get("id")))
+    # atomic rewrite
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(tmp, path)
+    # heal sidecar
+    ids = {str(r.get("id")) for r in rows if r.get("id")}
+    ids_path = path.with_name(path.name + ".ids")
+    ids_path.write_text("\n".join(sorted(ids)) + "\n", encoding="utf-8")
+    counts: dict[str, int] = {}
+    done: list[str] = []
+    for r in rows:
+        t = r.get("task") or {}
+        tid = t.get("task_id")
+        if tid:
+            counts[tid] = counts.get(tid, 0) + 1
+            if tid not in done:
+                done.append(tid)
+    sidecar.data["next_seq"] = max(int(sidecar.data.get("next_seq", 0) or 0), max_seq + 1)
+    sidecar.data["lines"] = len(rows)
+    sidecar.data["bytes"] = path.stat().st_size
+    sidecar.data["task_counts"] = counts
+    sidecar.data["done_task_ids"] = done
+    sidecar.save()
+    print(f"  healed {len(dupes)} duplicate id(s); {len(rows)} rows total", file=sys.stderr)
+    return len(dupes)
+    """Lowercase slug, so 'Syed Syab' and 'syab' are the same collector."""
+    cleaned = "".join(c if c.isalnum() or c in "-_" else "-" for c in (value or "").lower())
+    return cleaned.strip("-_")
+
+
 def _load_sidecar(path: Path) -> Sidecar:
     return Sidecar(path).load()
 
@@ -263,6 +337,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     sidecar = _load_sidecar(out_path)
     sidecar.reconcile_with_file(out_path)
+    # self-heal: if a previous run left duplicate ids (e.g. a recovered row
+    # was appended without persisting the sidecar), repair them in place so
+    # Ctrl+C -> restart always works without manual intervention.
+    _heal_duplicate_ids(out_path, sidecar)
     reporter = Reporter(run_id=sidecar.run_id or f"run-{int(time.time())}")
     sidecar.set_run(reporter.run_id, {"config": str(args.config) if args.config else None})
 
