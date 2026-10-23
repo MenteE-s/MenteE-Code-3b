@@ -22,7 +22,7 @@ SSH into the instance
 
 ### 1.2 Install dependencies
 ```bash
-git clone https://github.com/MenteEAI/MenteE-Code-3b.git
+git clone https://github.com/MenteE-s/MenteE-Code-3b.git
 cd MenteE-Code-3b
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-train.txt
