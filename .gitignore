@@ -8,11 +8,14 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-# ── Model & dataset artefacts (large) ─────────────────────────────────────
-# Artefacts live outside the repo; only configs, manifests and reports are tracked.
+# ── Model & dataset scratch (large) ───────────────────────────────────────
+# Scratch data is not tracked. Collector OUTPUT under datasets/ IS tracked -
+# that is what the team pushes and what gets merged.
 data/raw/
 data/processed/
 data/fetched/
+data/repos/
+data/workdirs/
 models/
 logs/
 artifacts/

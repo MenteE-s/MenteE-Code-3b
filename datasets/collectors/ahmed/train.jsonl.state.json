@@ -1,0 +1,10 @@
+{
+  "run_id": "run-1792751233",
+  "started_at": "2026-10-23T10:27:13Z",
+  "config": "configs/collect_config.replay.yaml",
+  "next_seq": 6,
+  "lines": 6,
+  "bytes": 16176,
+  "checkpointed_at": "2026-10-23T10:27:13Z",
+  "rejections": {}
+}

@@ -26,7 +26,7 @@ from typing import Any
 
 from .appender import AppendError, JsonlAppender
 from .budget import Budget
-from .config import load_config
+from .config import load_config, save_config
 from .integrity import IntegritySchedule, verify
 from .normalizer import build_record
 from .report import Reporter
@@ -44,9 +44,16 @@ def _seq(sidecar: Sidecar) -> int:
     return value
 
 
-def _record_id(sidecar: Sidecar) -> str:
+def _record_id(sidecar: Sidecar, collector_id: str = "") -> str:
     stamp = time.strftime("%Y-%m-%d")
-    return f"traj_{stamp}_{_seq(sidecar):06d}"
+    slug = f"{_slug(collector_id)}_" if _slug(collector_id) else ""
+    return f"traj_{slug}{stamp}_{_seq(sidecar):06d}"
+
+
+def _slug(value: str) -> str:
+    """Lowercase slug, so 'Syed Syab' and 'syab' are the same collector."""
+    cleaned = "".join(c if c.isalnum() or c in "-_" else "-" for c in (value or "").lower())
+    return cleaned.strip("-_")
 
 
 def _load_sidecar(path: Path) -> Sidecar:
@@ -117,6 +124,12 @@ def _shuffle_tools(cfg: dict[str, Any], tools: list[dict[str, Any]], task_id: st
 def cmd_run(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
     out_cfg = cfg["output"]
+
+    collector_id = _slug(str(args.collector or (cfg.get("collector", {}) or {}).get("id", "")))
+    if args.collector and not out_cfg.get("_explicit_path"):
+        root = (cfg.get("collector", {}) or {}).get("output_root", "datasets/collectors")
+        out_cfg["path"] = f"{root}/{collector_id}/train.jsonl"
+        out_cfg["rejected_path"] = f"{root}/{collector_id}/rejected.jsonl"
     out_path = Path(out_cfg["path"])
     rejected_path = Path(out_cfg["rejected_path"])
 
@@ -186,7 +199,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             reporter.generated += 1
             task_id = str(raw.task.get("task_id") or raw.task.get("issue_url") or reporter.generated)
 
-            record, problems = build_record(raw, _record_id(sidecar))
+            record, problems = build_record(raw, _record_id(sidecar, collector_id))
+            if collector_id:
+                record["provenance"]["collected_by"] = collector_id
             if record is None:
                 reporter.skip("normalize_failed")
                 reporter.note("normalize_failed", "; ".join(problems)[:300])
@@ -415,7 +430,149 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
-# --------------------------------------------------------------------------- main
+# --------------------------------------------------------------------------- team
+def cmd_init(args: argparse.Namespace) -> int:
+    """Scaffold one collector: their own folder, config and .env template."""
+    cid = _slug(args.collector)
+    if not cid:
+        print("  ! --collector is required (e.g. --collector syab)")
+        return 1
+    cfg = load_config(args.config)
+    cfg["collector"] = {"id": cid, "output_root": "datasets/collectors"}
+    cfg["output"]["path"] = f"datasets/collectors/{cid}/train.jsonl"
+    cfg["output"]["rejected_path"] = f"datasets/collectors/{cid}/rejected.jsonl"
+
+    cfg_path = Path(f"configs/collectors/{cid}.yaml")
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    save_config(cfg, cfg_path)
+
+    Path(f"datasets/collectors/{cid}").mkdir(parents=True, exist_ok=True)
+    env_path = Path(f"datasets/collectors/{cid}/.env")
+    if not env_path.exists():
+        env_path.write_text(
+            "OPENROUTER_API_KEY=paste-your-key-here\n"
+            "DEEPSEEK_API_KEY=paste-your-key-here\n",
+            encoding="utf-8",
+        )
+    print(f"  collector : {cid}")
+    print(f"  config    : {cfg_path}")
+    print(f"  output    : {cfg['output']['path']}")
+    print(f"  env       : {env_path}  (put your key here; .env is gitignored)")
+    print(f"\n  run:  python -m src.collect run --config {cfg_path}")
+    return 0
+
+
+def cmd_partition(args: argparse.Namespace) -> int:
+    """Split a task file into N disjoint shards so collectors never overlap.
+
+    Deterministic: the same task file and N always produce the same shards, so
+    re-running it (or another team member re-running it) agrees.
+    """
+    import hashlib
+
+    tasks = load_tasks(args.tasks)
+    n = max(1, args.collectors)
+    shards: list[list[Any]] = [[] for _ in range(n)]
+    for t in tasks:
+        idx = int(hashlib.sha256(t.task_id.encode("utf-8")).hexdigest()[:8], 16) % n
+        shards[idx].append(t)
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for i, shard in enumerate(shards):
+        p = out_dir / f"shard-{i + 1}-of-{n}.jsonl"
+        with open(p, "w", encoding="utf-8") as fh:
+            for t in shard:
+                fh.write(
+                    json.dumps(
+                        {
+                            "task_id": t.task_id,
+                            "instruction": t.instruction,
+                            "repo": t.repo,
+                            "base_commit": t.base_commit,
+                            "setup_script": t.setup_script,
+                            "test_command": t.test_command,
+                            "language": t.language,
+                            "task_type": t.task_type,
+                            "difficulty": t.difficulty,
+                            "workdir": t.workdir,
+                            "fail_to_pass": t.fail_to_pass or [],
+                            "pass_to_pass": t.pass_to_pass or [],
+                            **({"issue_url": t.issue_url} if t.issue_url else {}),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        print(f"  {p.name}: {len(shard)} task(s)")
+    print(f"\n  {n} disjoint shards written to {out_dir}")
+    print("  every task_id is in exactly one shard, so no two collectors overlap.")
+    return 0
+
+
+def cmd_merge(args: argparse.Namespace) -> int:
+    from .merge import merge_datasets
+
+    schema_path = Path(args.schema) if args.schema else Path("schemas/mentee-trajectory-v1.schema.json")
+    schema = load_schema(schema_path) if schema_path.exists() else None
+    validator_obj = make_validator(schema) if schema else None
+
+    inputs = [Path(p) for p in args.inputs]
+    inputs = [p for p in inputs if p.exists() and p.stat().st_size > 0]
+    dropped = len(args.inputs) - len(inputs)
+    if dropped:
+        print(f"  ({dropped} empty/missing input(s) skipped)")
+    if not inputs:
+        print("  ! nothing to merge")
+        return 1
+
+    out_path = Path(args.out)
+    report = merge_datasets(inputs, out_path, validator=validator_obj, verbose=True)
+
+    print("\n  merge " + ("OK" if report.ok else "FAILED"))
+    print(f"  accepted total : {report.total_accepted}")
+    print(f"  duplicate ids  : {report.total_duplicate_id}")
+    print(f"  duplicate content: {report.total_duplicate_content}")
+    print(f"  schema invalid : {report.total_schema_invalid}")
+    print(f"  output         : {report.output_path} ({report.output_lines} rows)")
+    for note in report.notes:
+        print(f"  ! {note}")
+
+    verified = sum(s.verified for s in report.sources)
+    fp = sum(s.failure_path for s in report.sources)
+    if report.total_accepted:
+        print("\n  quality across collectors:")
+        print(f"    verified rows   {verified} ({verified / max(1, report.total_accepted) * 100:.0f}%)")
+        print(f"    failure-path    {fp} ({fp / max(1, report.total_accepted) * 100:.0f}%)  <- target >= 30%")
+        print("    per collector:")
+        for s in report.sources:
+            rate = (s.verified / s.accepted * 100) if s.accepted else 0
+            print(f"      {Path(s.path).parent.name:<16} kept={s.accepted:<6} verified={rate:.0f}%")
+
+    rep_path = out_path.with_name(out_path.stem + ".merge-report.json")
+    rep_path.write_text(
+        json.dumps(
+            {
+                "ok": report.ok,
+                "total_accepted": report.total_accepted,
+                "duplicate_id": report.total_duplicate_id,
+                "duplicate_content": report.total_duplicate_content,
+                "schema_invalid": report.total_schema_invalid,
+                "output": report.output_path,
+                "output_lines": report.output_lines,
+                "sources": [vars(s) for s in report.sources],
+                "notes": report.notes,
+            },
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    print(f"\n  report: {rep_path}")
+    return 0 if report.ok else 1
+
+
+
 def main(argv: list[str] | None = None) -> int:
     # Windows consoles default to cp1252 and will raise on a non-ASCII symbol.
     for stream in (sys.stdout, sys.stderr):
@@ -429,6 +586,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_run = sub.add_parser("run", help="generate, validate and append trajectories")
     p_run.add_argument("--config", default=None, help="path to the collector config")
+    p_run.add_argument("--collector", default=None, help="collector id (e.g. syab) - namespaces ids and output")
     p_run.add_argument("--limit", type=int, default=None, help="stop after N accepted rows")
     p_run.add_argument("--dry-run", action="store_true", help="generate one row and print it")
     p_run.set_defaults(func=cmd_run)
@@ -455,6 +613,23 @@ def main(argv: list[str] | None = None) -> int:
     p_report = sub.add_parser("report", help="print the last run report")
     p_report.add_argument("--path", required=True)
     p_report.set_defaults(func=cmd_report)
+
+    p_init = sub.add_parser("init", help="scaffold one collector (their own folder + config)")
+    p_init.add_argument("--collector", required=True, help="collector id, e.g. syab")
+    p_init.add_argument("--config", default=None, help="base config to copy from")
+    p_init.set_defaults(func=cmd_init)
+
+    p_part = sub.add_parser("partition", help="split a task file into N disjoint shards")
+    p_part.add_argument("--tasks", required=True)
+    p_part.add_argument("--collectors", type=int, required=True)
+    p_part.add_argument("--out", default="data/tasks/shards")
+    p_part.set_defaults(func=cmd_partition)
+
+    p_merge = sub.add_parser("merge", help="merge several collectors' datasets into one")
+    p_merge.add_argument("--inputs", nargs="+", required=True, help="collector train.jsonl paths")
+    p_merge.add_argument("--out", required=True)
+    p_merge.add_argument("--schema", default=None)
+    p_merge.set_defaults(func=cmd_merge)
 
     args = parser.parse_args(argv)
     return int(args.func(args) or 0)

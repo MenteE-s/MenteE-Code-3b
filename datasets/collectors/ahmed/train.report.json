@@ -1,0 +1,29 @@
+{
+  "run_id": "run-1792751233",
+  "elapsed_s": 0.3,
+  "generated": 6,
+  "accepted": 6,
+  "rejected": 0,
+  "skipped": 0,
+  "acceptance_rate": 1.0,
+  "deep_checked": 0,
+  "integrity_checks": 1,
+  "integrity_failures": 0,
+  "verification_status": {
+    "skipped": 6
+  },
+  "verified_rate": 0.0,
+  "failure_path_rate": 0.0,
+  "mean_turns": 7.0,
+  "max_turns": 7,
+  "mean_tokens": 0.0,
+  "rejections_by_check": {},
+  "rejection_examples": {},
+  "events": [
+    {
+      "at": "13:27:13",
+      "kind": "budget",
+      "detail": "stopped: max_rows"
+    }
+  ]
+}

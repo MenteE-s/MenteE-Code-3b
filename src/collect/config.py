@@ -14,6 +14,11 @@ from typing import Any
 __all__ = ["DEFAULTS", "load_config", "save_config"]
 
 DEFAULTS: dict[str, Any] = {
+    "collector": {
+        "id": "",  # e.g. "syab" - empty = single-collector mode (no id prefix)
+        # outputs live under datasets/ (tracked in git) so the team can push
+        "output_root": "datasets/collectors",
+    },
     "source": {
         "kind": "harness",  # harness | replay
         "harness": "opencode",
@@ -62,8 +67,8 @@ DEFAULTS: dict[str, Any] = {
         },
     },
     "output": {
-        "path": "data/processed/v1.0.0/train.jsonl",
-        "rejected_path": "data/processed/v1.0.0/rejected.jsonl",
+        "path": "datasets/collectors/single/train.jsonl",
+        "rejected_path": "datasets/collectors/single/rejected.jsonl",
         "fsync_every": 10,
         "resume": True,
     },

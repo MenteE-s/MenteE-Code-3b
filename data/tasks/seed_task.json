@@ -1,0 +1,19 @@
+{
+    "task_id":  "mine_more-itertools_67fcf640",
+    "instruction":  "In this Python repository, bucket() raises an error or behaves incorrectly when the validator is falsey (e.g. None or an empty callable result). The failing test is TestBucket::test_falsey_validator_is_honoured in tests/test_more.py. Investigate the bucket() implementation in more_itertools/more.py, fix it so a falsey validator is honoured, and verify by running the failing test.",
+    "repo":  "more-itertools",
+    "repo_url":  "https://github.com/more-itertools/more-itertools",
+    "repo_license":  "MIT",
+    "base_commit":  "1ea82a711c69f590054987b5cb194157f8ce8ac4",
+    "fix_commit":  "67fcf640477c78605580f5ee703a54c73c1e7a8a",
+    "language":  "python",
+    "task_type":  "bug_fix",
+    "difficulty":  "medium",
+    "workdir":  "F:\\code\\mentee-code-3b\\data\\repos\\more-itertools",
+    "fail_to_pass":  [
+                         "tests/test_more.py::TestBucket::test_falsey_validator_is_honoured"
+                     ],
+    "pass_to_pass":  [
+
+                     ]
+}

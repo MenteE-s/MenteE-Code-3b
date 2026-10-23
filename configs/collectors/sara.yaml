@@ -1,0 +1,77 @@
+collector:
+  id: sara
+  output_root: datasets/collectors
+source:
+  kind: harness
+  harness: opencode
+  tasks_path: data/tasks/tasks.jsonl
+  opencode:
+    server_url: http://127.0.0.1:4096
+    auth_user: opencode
+    auth_password_env: OPENCODE_SERVER_PASSWORD
+    model: ''
+    agent: ''
+    timeout_s: 1800
+  replay:
+    path: ''
+  teacher:
+    model: Qwen/Qwen3-Coder-Next
+    revision: main
+    license: Apache-2.0
+    base_url: http://127.0.0.1:8000/v1
+    sampling:
+      temperature: 1.0
+      top_p: 0.95
+      top_k: 40
+  proxy:
+    enabled: false
+    listen_host: 127.0.0.1
+    listen_port: 8010
+    log_dir: data/raw/proxy_logs
+  generator:
+    source_id: mentee_synth_v1
+    source_url: internal
+    source_sha256: ''
+    license: Apache-2.0
+    license_verified: true
+    redistributable: true
+    trainable: true
+    collected_by: collector
+    code_version: ''
+    prompt_template: ''
+  tool_schema_shuffle:
+    enabled: true
+    probability: 0.35
+    rename_probability: 0.8
+    rename_params_probability: 0.7
+    drop_probability: 0.25
+    add_probability: 0.35
+output:
+  path: datasets/collectors/sara/train.jsonl
+  rejected_path: datasets/collectors/sara/rejected.jsonl
+  fsync_every: 10
+  resume: true
+validation:
+  schema_path: schemas/mentee-trajectory-v1.schema.json
+  tier_b_sample_rate: 0.02
+  tier_b_timeout_s: 900
+  require_verified: false
+  min_chars: 400
+  max_chars: 400000
+  max_identical_tool_calls: 3
+integrity:
+  enabled: true
+  first_check_at: 10
+  gaps:
+  - 30
+  - 45
+  - 60
+  - 90
+  steady_every: 200
+  jitter_ratio: 0.3
+  full_rescan_every: 5
+  on_failure: abort
+budget:
+  max_rows: null
+  max_minutes: null
+  max_generation_tokens: null

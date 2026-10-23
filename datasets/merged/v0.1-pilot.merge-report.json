@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "total_accepted": 6,
+  "duplicate_id": 0,
+  "duplicate_content": 6,
+  "schema_invalid": 0,
+  "output": "datasets\\merged\\v0.1-pilot.jsonl",
+  "output_lines": 6,
+  "sources": [
+    {
+      "path": "datasets\\collectors\\syab\\train.jsonl",
+      "rows": 6,
+      "accepted": 6,
+      "duplicate_id": 0,
+      "duplicate_content": 0,
+      "schema_invalid": 0,
+      "integrity_ok": true,
+      "integrity_note": "[OK] datasets\\collectors\\syab\\train.jsonl lines=6 bytes=16164",
+      "verified": 0,
+      "failure_path": 0
+    },
+    {
+      "path": "datasets\\collectors\\ahmed\\train.jsonl",
+      "rows": 6,
+      "accepted": 0,
+      "duplicate_id": 0,
+      "duplicate_content": 6,
+      "schema_invalid": 0,
+      "integrity_ok": true,
+      "integrity_note": "[OK] datasets\\collectors\\ahmed\\train.jsonl lines=6 bytes=16176",
+      "verified": 0,
+      "failure_path": 0
+    }
+  ],
+  "notes": []
+}

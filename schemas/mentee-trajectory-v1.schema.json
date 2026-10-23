@@ -24,8 +24,8 @@
     },
     "id": {
       "type": "string",
-      "pattern": "^traj_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}$",
-      "description": "Unique trajectory id."
+      "pattern": "^traj_(?:[a-z0-9][a-z0-9_-]{0,23}_)?[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}$",
+      "description": "Unique trajectory id. May carry a collector slug (traj_syab_...) so parallel collectors never collide."
     },
 
     "provenance": {
