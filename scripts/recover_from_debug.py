@@ -105,6 +105,8 @@ def main() -> int:
         return 1
 
     sidecar = Sidecar(REPO / f"datasets/collectors/{_slug(args.collector)}" / "train.jsonl").load()
+    sidecar.reconcile_with_file(REPO / f"datasets/collectors/{_slug(args.collector)}" / "train.jsonl")
+    sidecar.open()
     rid = _record_id(sidecar, args.collector)
 
     from src.collect.normalizer import RawTrajectory  # noqa: E402
@@ -172,6 +174,9 @@ def main() -> int:
     with JsonlAppender(out, fsync_every=1) as app:
         app.append(record)
     sidecar.add_id(record["id"])
+    sidecar.add_id(record["id"])
+    sidecar.add_task((record.get("task") or {}).get("task_id", ""))
+    sidecar.close()
     print(f"  recovered {record['id']} -> {out}")
     report = verify(out, deep=True, schema=schema, validator=validator)
     print(f"  file check: {report.summary()}")

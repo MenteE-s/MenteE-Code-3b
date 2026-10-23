@@ -513,6 +513,7 @@ def build_record(
         "id": record_id,
         "provenance": prov,
         "task": {
+            "task_id": task.get("task_id", ""),
             "instruction": task.get("instruction", ""),
             "language": task.get("language", "unknown"),
             "task_type": task.get("task_type", "bug_fix"),

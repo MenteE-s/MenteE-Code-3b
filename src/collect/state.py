@@ -52,6 +52,7 @@ class Sidecar:
                 line = line.strip()
                 if line:
                     self._ids.add(line)
+        self._done_tasks = set(self.data.get("done_task_ids", []) or [])
         return self
 
     def open(self) -> "Sidecar":
@@ -99,6 +100,49 @@ class Sidecar:
         if self._ids_fh is not None:
             self._ids_fh.write(trajectory_id + "\n")
             self._ids_fh.flush()
+
+    # ------------------------------------------------------------------ tasks
+    def has_task(self, task_id: str) -> bool:
+        return bool(task_id) and task_id in self._done_tasks
+
+    def add_task(self, task_id: str) -> None:
+        if not task_id or task_id in self._done_tasks:
+            return
+        self._done_tasks.add(task_id)
+        self.data.setdefault("done_task_ids", [])
+        if task_id not in self.data["done_task_ids"]:
+            self.data["done_task_ids"].append(task_id)
+        # persist immediately so a restart skips it
+        self.save()
+
+    def reconcile_with_file(self, path: Path) -> None:
+        # self-heal: trust the file on disk for ids + done tasks + next_seq
+        if not path.is_file():
+            return
+        max_seq = int(self.data.get("next_seq", 0) or 0)
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            tid = rec.get("id")
+            if tid:
+                self._ids.add(tid)
+                # extract trailing seq number
+                tail = tid.rsplit("_", 1)[-1]
+                if tail.isdigit():
+                    max_seq = max(max_seq, int(tail) + 1)
+            task = rec.get("task") or {}
+            task_id = task.get("task_id")
+            if task_id:
+                self._done_tasks.add(task_id)
+                self.data.setdefault("done_task_ids", [])
+                if task_id not in self.data["done_task_ids"]:
+                    self.data["done_task_ids"].append(task_id)
+        self.data["next_seq"] = max_seq
 
     def set_run(self, run_id: str, extra: dict | None = None) -> None:
         self.data["run_id"] = run_id

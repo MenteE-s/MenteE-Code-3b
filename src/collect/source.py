@@ -56,6 +56,7 @@ class Task:
 
     def to_record_task(self) -> dict[str, Any]:
         out: dict[str, Any] = {
+            "task_id": self.task_id,
             "instruction": self.instruction,
             "repo": self.repo,
             "base_commit": self.base_commit,

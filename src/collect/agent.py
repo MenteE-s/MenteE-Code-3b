@@ -491,6 +491,7 @@ class AgentRunner:
         stop_reason = "completed"
         consecutive_errors = 0
         last_test_result: ToolResult | None = None
+        last_provider_error: str | None = None
         started = time.time()
 
         for _turn in range(self.cfg.max_turns):
@@ -500,6 +501,7 @@ class AgentRunner:
                 consecutive_errors += 1
                 if consecutive_errors >= 2:
                     stop_reason = "error"
+                    last_provider_error = str(exc)
                     common.append(CommonMessage(role="assistant", content=f"run stopped: {exc}"))
                     break
                 # tell the model and let it continue with a simpler step
@@ -633,6 +635,7 @@ class AgentRunner:
             "total_tokens": {"input": usage_in, "output": usage_out},
             "stop_reason": stop_reason,
             "verified_by_agent": last_test_result.ok if last_test_result else None,
+            "provider_error": last_provider_error,
         }
         # outcome evidence: the agent's own last test run. Honest and cheap, and
         # the honest_conclusion check cross-examines it against what the model claims.
