@@ -1,0 +1,35 @@
+# Repos to mine for bug-fix tasks
+# Format: url  name  (name is the directory name under data/repos/)
+# Pick repos with good test suites and active bug-fix history.
+# Skip: repos that are too large (>500MB clone), repos without tests.
+
+https://github.com/psf/requests.git requests
+https://github.com/pallets/flask.git flask
+https://github.com/django/django.git django
+https://github.com/numpy/numpy.git numpy
+https://github.com/pandas-dev/pandas.git pandas
+https://github.com/scikit-learn/scikit-learn.git scikit-learn
+https://github.com/matplotlib/matplotlib.git matplotlib
+https://github.com/pytest-dev/pytest.git pytest
+https://github.com/encode/httpx.git httpx
+https://github.com/aio-libs/aiohttp.git aiohttp
+https://github.com/sqlalchemy/sqlalchemy.git sqlalchemy
+https://github.com/pydantic/pydantic.git pydantic
+https://github.com/tiangolo/fastapi.git fastapi
+https://github.com/celery/celery.git celery
+https://github.com/redis/redis-py.git redis-py
+https://github.com/boto/boto3.git boto3
+https://github.com/urllib3/urllib3.git urllib3
+https://github.com/certifi/python-certifi.git certifi
+https://github.com/arrow-py/arrow.git arrow
+https://github.com/dateutil/dateutil.git dateutil
+https://github.com/more-itertools/more-itertools.git more-itertools
+https://github.com/Textualize/rich.git rich
+https://github.com/Textualize/textual.git textual
+https://github.com/tqdm/tqdm.git tqdm
+https://github.com/python-attrs/attrs.git attrs
+https://github.com/pypa/pip.git pip
+https://github.com/psf/black.git black
+https://github.com/pylint-dev/pylint.git pylint
+https://github.com/pytest-dev/pytest-cov.git pytest-cov
+https://github.com/coveragepy/coveragepy.git coveragepy
