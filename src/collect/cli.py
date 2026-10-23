@@ -37,6 +37,32 @@ from .validate import DeepVerifier, TierAValidator, load_schema, make_validator
 __all__ = ["main"]
 
 
+def _load_env_files(collector: str = "") -> None:
+    """Fill os.environ from .env files without overriding real environment keys.
+
+    Searched in order (first hit wins, none override the actual environment):
+      1. datasets/collectors/<collector>/.env   (collector-specific keys)
+      2. repo-root .env
+    """
+    root = Path(__file__).resolve().parents[2]
+    candidates = []
+    if collector:
+        candidates.append(root / "datasets" / "collectors" / collector / ".env")
+    candidates.append(root / ".env")
+    for path in candidates:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
 # --------------------------------------------------------------------------- helpers
 def _seq(sidecar: Sidecar) -> int:
     value = int(sidecar.data.get("next_seq", 0) or 0)
@@ -679,6 +705,8 @@ def main(argv: list[str] | None = None) -> int:
     p_merge.set_defaults(func=cmd_merge)
 
     args = parser.parse_args(argv)
+    # keys come from the environment; .env files top it up (never override)
+    _load_env_files(getattr(args, "collector", "") or "")
     return int(args.func(args) or 0)
 
 

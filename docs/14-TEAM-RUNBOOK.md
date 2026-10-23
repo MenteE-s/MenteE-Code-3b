@@ -12,10 +12,14 @@
 
 ```bash
 git clone <repo> && cd mentee-code-3b
-pip install -r requirements-collect.txt
+
+# Python 3.12+ is required (the repos we collect from use modern syntax).
+# On Windows, create a venv once and use it everywhere below:
+py -3.12 -m venv .venv312
+.venv312\Scripts\python.exe -m pip install -r requirements-collect.txt
 
 # 1. claim your collector name (use your own name, lowercase)
-python -m src.collect init --collector <yourname>
+.venv312\Scripts\python.exe -m src.collect init --collector <yourname>
 ```
 
 This creates **only your** files:
@@ -36,9 +40,18 @@ OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
 It is gitignored — **never** put a key anywhere else, and **never** paste it into
-the chat, a ticket or a screenshot.
+the chat, a ticket or a screenshot. The CLI loads this file automatically on
+every command, so no `export` is needed.
 
-3. Get your task shard from Syab (see §4) into `data/tasks/`.
+3. Get your task shard from Syab (see §4) into `data/tasks/`, then build your
+local worktree for each task (**run this once per shard — it makes no API
+calls**, it only checks out code and verifies the tests fail):
+
+```bash
+.venv312\Scripts\python.exe scripts/prepare_tasks.py --in data/tasks/shard-2-of-4.jsonl --out data/tasks/prepared-<yourname>.jsonl
+```
+
+Point your config's `source.tasks_path` at your `prepared-<yourname>.jsonl`.
 
 ---
 
@@ -46,19 +59,23 @@ the chat, a ticket or a screenshot.
 
 ```bash
 # dry run first - generates ONE trajectory and prints it, costs almost nothing
-python -m src.collect run --config configs/collectors/<yourname>.yaml --dry-run
+.venv312\Scripts\python.exe -m src.collect run --config configs/collectors/<yourname>.yaml --dry-run
 
 # real run, capped for the first day
-python -m src.collect run --config configs/collectors/<yourname>.yaml --limit 20
+.venv312\Scripts\python.exe -m src.collect run --config configs/collectors/<yourname>.yaml --limit 20
 ```
 
 Then check it worked:
 
 ```bash
-python -m src.collect verify --path datasets/collectors/<yourname>/train.jsonl
-python -m src.collect tail   --path datasets/collectors/<yourname>/train.jsonl -n 3
-python -m src.collect report --path datasets/collectors/<yourname>/train.jsonl
+.venv312\Scripts\python.exe -m src.collect verify --path datasets/collectors/<yourname>/train.jsonl
+.venv312\Scripts\python.exe -m src.collect tail   --path datasets/collectors/<yourname>/train.jsonl -n 3
+.venv312\Scripts\python.exe -m src.collect report --path datasets/collectors/<yourname>/train.jsonl
 ```
+
+The agent source also writes `debug-<id>.json` for every run it rejects, so a
+failed row can always be inspected or recovered with
+`scripts/recover_from_debug.py`.
 
 The report prints the three numbers that decide whether your run is any good:
 
@@ -98,7 +115,7 @@ person:
 
 ```bash
 # Syab runs this once, then hands out the files:
-python -m src.collect partition --tasks data/tasks/tasks.jsonl --collectors 4
+python -m src.collect partition --tasks data/tasks/prepared.jsonl --collectors 4
 
 #   shard-1-of-4.jsonl
 #   shard-2-of-4.jsonl
