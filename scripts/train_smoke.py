@@ -113,8 +113,15 @@ def main():
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=2e-4,
         max_length=args.max_seq_length,
-        logging_steps=1,
-        save_steps=100,
+        logging_steps=10,
+        save_steps=500,
+        save_total_limit=2,
+        gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        optim="adamw_torch_fused",
+        warmup_ratio=0.03,
+        lr_scheduler_type="cosine",
+        report_to="none",
         bf16=True,
     )
 
