@@ -105,10 +105,12 @@ du -sh outputs/full_run/  # should be ~6GB
 python scripts/upload_model.py --model-dir outputs/full_run --repo MenteEAI/MenteE-Code-3B
 ```
 
-### 4.2 Upload the dataset (optional but recommended)
+### 4.3 Benchmark on SWE-bench Verified
 ```bash
-huggingface-cli upload MenteEAI/MenteE-Code-3B-Dataset data/training/train.jsonl train.jsonl
+python scripts/benchmark.py --model MenteEAI/MenteE-Code-3B --tasks 50
 ```
+
+Runs 50 SWE-bench Verified tasks and reports resolve rate vs baselines (GPT-4o, Claude, etc.).
 
 ### 4.3 Verify on HuggingFace
 ```
