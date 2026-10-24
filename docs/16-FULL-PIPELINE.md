@@ -187,12 +187,12 @@ python -m src.collect merge --inputs data/collected/prepared.jsonl data/training
 
 ### Smoke test (local, ~5 min)
 ```powershell
-python scripts/download_datasets.py --out data/external --max-rows 200 && python scripts/preprocess_external.py --in data/external --out data/external/prepared.jsonl && python -m src.collect merge --inputs data/external/prepared.jsonl datasets/collectors/syab/train.jsonl --out data/training/train.jsonl && python scripts/train_smoke.py --data data/training/train.jsonl --max-samples 50
+python scripts/download_datasets.py --out data/external --max-rows 200 && python scripts/preprocess_external.py --in data/external --out data/external/prepared.jsonl && python scripts/generate_identity_data.py --out data/identity/identity.jsonl --count 500 && python -m src.collect merge --inputs data/external/prepared.jsonl datasets/collectors/syab/train.jsonl data/identity/identity.jsonl --out data/training/train.jsonl && python scripts/train_smoke.py --data data/training/train.jsonl --max-samples 50
 ```
 
 ### Production (vast.ai, ~4 hours, ~$2)
 ```bash
-python scripts/download_datasets.py --out data/external --max-rows 25000 && python scripts/preprocess_external.py --in data/external --out data/external/prepared.jsonl && python -m src.collect merge --inputs data/external/prepared.jsonl datasets/collectors/syab/train.jsonl --out data/training/train.jsonl && python scripts/train_smoke.py --data data/training/train.jsonl --max-samples 999999 --model Qwen/Qwen2.5-Coder-3B-Instruct --output outputs/full_run
+python scripts/download_datasets.py --out data/external --max-rows 25000 && python scripts/preprocess_external.py --in data/external --out data/external/prepared.jsonl && python scripts/generate_identity_data.py --out data/identity/identity.jsonl --count 500 && python -m src.collect merge --inputs data/external/prepared.jsonl datasets/collectors/syab/train.jsonl data/identity/identity.jsonl --out data/training/train.jsonl && python scripts/train_smoke.py --data data/training/train.jsonl --max-samples 999999 --model Qwen/Qwen2.5-Coder-3B-Instruct --output outputs/full_run
 ```
 
 ### Upload
