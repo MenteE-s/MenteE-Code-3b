@@ -106,7 +106,7 @@ def main():
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
-        max_seq_length=args.max_seq_length,
+        max_length=args.max_seq_length,
         logging_steps=10,
         save_steps=500,
         save_total_limit=3,
