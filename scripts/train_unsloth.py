@@ -70,21 +70,14 @@ def main():
         print("  ! too few samples, need at least 5")
         raise SystemExit(1)
 
-    # YaRN scaling for extended context (32K native -> target)
-    rope_scaling = None
-    if args.context_length > 32768:
-        factor = args.context_length / 32768
-        rope_scaling = {"type": "yarn", "factor": factor}
-        print(f"  YaRN scaling: 32768 -> {args.context_length} (factor {factor:.1f})")
-
     # Load model with Unsloth (2-5x faster, less VRAM)
+    # Train on native 32K. YaRN scaling applied post-training to config.json.
     print(f"  loading {args.model} with Unsloth (4-bit)...")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=args.model,
-        max_seq_length=args.context_length,
+        max_seq_length=args.max_seq_length,
         dtype=None,  # auto-detect
         load_in_4bit=True,
-        rope_scaling=rope_scaling,
     )
 
     # LoRA config (Unsloth optimized)
@@ -115,7 +108,7 @@ def main():
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
-        max_length=args.context_length,
+        max_seq_length=args.max_seq_length,
         logging_steps=10,
         save_steps=500,
         save_total_limit=3,
@@ -136,6 +129,18 @@ def main():
 
     print(f"  training {len(rows)} samples for {args.epochs} epochs...")
     trainer.train()
+
+    # Apply YaRN rope_scaling to config.json for 128K inference support
+    if args.context_length > 32768:
+        import json as _json
+        cfg_path = out_dir / "config.json"
+        if cfg_path.exists():
+            cfg = _json.loads(cfg_path.read_text())
+            factor = args.context_length / 32768
+            cfg["rope_scaling"] = {"type": "yarn", "factor": factor, "original_max_position_embeddings": 32768}
+            cfg["max_position_embeddings"] = args.context_length
+            cfg_path.write_text(_json.dumps(cfg, indent=2))
+            print(f"  YaRN scaling applied: 32768 -> {args.context_length} (factor {factor:.1f})")
 
     # Save merged model (LoRA weights merged into base)
     print("  saving merged model...")

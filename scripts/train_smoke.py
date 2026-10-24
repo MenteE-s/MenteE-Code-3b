@@ -78,18 +78,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    rope_scaling = None
-    if args.context_length > 32768:
-        factor = args.context_length / 32768
-        rope_scaling = {"type": "yarn", "factor": factor}
-        print(f"  YaRN scaling: 32768 -> {args.context_length} (factor {factor:.1f})")
-
+    # Train on native context (32K). YaRN scaling is applied post-training
+    # to the saved config.json for inference-time 128K support.
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype="auto",
         device_map="auto",
         trust_remote_code=True,
-        rope_scaling=rope_scaling,
     )
 
     # LoRA
@@ -134,6 +129,19 @@ def main():
     trainer.train()
     trainer.save_model(str(out_dir))
     tokenizer.save_pretrained(str(out_dir))
+
+    # Apply YaRN rope_scaling to config.json for 128K inference support
+    if args.context_length > 32768:
+        import json as _json
+        cfg_path = out_dir / "config.json"
+        if cfg_path.exists():
+            cfg = _json.loads(cfg_path.read_text())
+            factor = args.context_length / 32768
+            cfg["rope_scaling"] = {"type": "yarn", "factor": factor, "original_max_position_embeddings": 32768}
+            cfg["max_position_embeddings"] = args.context_length
+            cfg_path.write_text(_json.dumps(cfg, indent=2))
+            print(f"  YaRN scaling applied: 32768 -> {args.context_length} (factor {factor:.1f})")
+
     print(f"  smoke test complete -> {out_dir}")
     print("  if this ran without errors, your data pipeline is ready for vast.ai")
 
