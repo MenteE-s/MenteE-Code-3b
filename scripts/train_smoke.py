@@ -97,6 +97,8 @@ def main():
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, lora_config)
+    # Required for gradient checkpointing with frozen base weights
+    model.enable_input_require_grads()
     model.print_trainable_parameters()
 
     # Train
@@ -106,7 +108,7 @@ def main():
     out_dir = REPO / args.output
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    config = SFTConfig(
+    config_kwargs = dict(
         output_dir=str(out_dir),
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
@@ -124,6 +126,16 @@ def main():
         report_to="none",
         bf16=True,
     )
+
+    # transformers 5.x / trl variants rename or drop TrainingArguments fields.
+    # Keep only what this install actually accepts, and say what was skipped.
+    import inspect
+
+    _accepted = inspect.signature(SFTConfig.__init__).parameters
+    _dropped = sorted(k for k in config_kwargs if k not in _accepted)
+    if _dropped:
+        print(f"  ! SFTConfig does not support: {', '.join(_dropped)} (skipped)")
+    config = SFTConfig(**{k: v for k, v in config_kwargs.items() if k in _accepted})
 
     trainer = SFTTrainer(
         model=model,
