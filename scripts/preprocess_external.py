@@ -9,15 +9,33 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
+
+def _normalize_role(role: str) -> str:
+    role = (role or "assistant").lower().strip()
+    if role in ("tool", "function"):
+        return "tool_result"
+    if role not in ("system", "user", "assistant", "tool_result"):
+        return "assistant"
+    return role
+
+
+def _safe_content(content) -> str:
+    if content is None:
+        return "[no content]"
+    s = str(content).strip()
+    return s if s else "[no content]"
 
 
 def convert_swe_agent(row: dict) -> dict | None:
     """Convert a SWE-agent trajectory row to mente format."""
     messages = []
-    # SWE-agent stores trajectory as a list of steps
     traj = row.get("trajectory") or row.get("traj") or []
     if isinstance(traj, str):
         try:
@@ -27,8 +45,8 @@ def convert_swe_agent(row: dict) -> dict | None:
     for step in traj:
         if not isinstance(step, dict):
             continue
-        role = step.get("role", "assistant")
-        content = step.get("content", "") or step.get("thought", "") or ""
+        role = _normalize_role(step.get("role", "assistant"))
+        content = _safe_content(step.get("content", "") or step.get("thought", "") or "")
         tool_calls = []
         if step.get("action"):
             tool_calls.append({
@@ -42,7 +60,7 @@ def convert_swe_agent(row: dict) -> dict | None:
             tool_results.append({
                 "tool_call_id": step.get("tool_call_id", f"call_{len(messages)}"),
                 "name": step.get("action", "tool"),
-                "content": str(step.get("observation", ""))[:4000],
+                "content": _safe_content(str(step.get("observation", ""))[:4000]),
                 "truncated": False,
             })
         msg = {"role": role, "content": content}
@@ -57,7 +75,7 @@ def convert_swe_agent(row: dict) -> dict | None:
 
     return {
         "task": {
-            "instruction": row.get("problem_statement") or row.get("issue") or row.get("text", ""),
+            "instruction": _safe_content(row.get("problem_statement") or row.get("issue") or row.get("text", "")),
             "language": "python",
             "task_type": "bug_fix",
             "difficulty": "unlabelled",
@@ -67,7 +85,7 @@ def convert_swe_agent(row: dict) -> dict | None:
             "task_id": row.get("instance_id") or row.get("task_id", ""),
         },
         "messages": messages,
-        "model": row.get("model", "unknown"),
+        "model": row.get("model_name", "unknown"),
         "started_at": "",
         "verification": {"status": "skipped", "method": "external_dataset"},
         "generator": {
@@ -78,14 +96,13 @@ def convert_swe_agent(row: dict) -> dict | None:
             "trainable": True,
             "collected_by": "imported",
             "prompt_template": "external",
-            "teacher": {"model": row.get("model", "unknown"), "revision": "unknown", "license": "MIT", "sampling": {}},
+            "teacher": {"model": row.get("model_name", "unknown"), "revision": "unknown", "license": "MIT", "sampling": {}},
         },
     }
 
 
 def convert_openhands(row: dict) -> dict | None:
     """Convert an OpenHands trajectory row to mente format."""
-    # OpenHands stores messages as a list of dicts with role/content
     messages_raw = row.get("messages") or row.get("trajectory") or []
     if isinstance(messages_raw, str):
         try:
@@ -96,7 +113,7 @@ def convert_openhands(row: dict) -> dict | None:
     for m in messages_raw:
         if not isinstance(m, dict):
             continue
-        msg = {"role": m.get("role", "assistant"), "content": m.get("content", "") or ""}
+        msg = {"role": _normalize_role(m.get("role", "assistant")), "content": _safe_content(m.get("content", "") or "")}
         if m.get("tool_calls"):
             msg["tool_calls"] = m["tool_calls"]
         if m.get("tool_results") or m.get("tool_call_results"):
@@ -106,7 +123,7 @@ def convert_openhands(row: dict) -> dict | None:
         return None
     return {
         "task": {
-            "instruction": row.get("problem_statement") or row.get("issue", ""),
+            "instruction": _safe_content(row.get("problem_statement") or row.get("issue", "")),
             "language": "python",
             "task_type": "bug_fix",
             "difficulty": "unlabelled",
@@ -135,6 +152,8 @@ def convert_openhands(row: dict) -> dict | None:
 CONVERTERS = {
     "swe_agent": convert_swe_agent,
     "openhands": convert_openhands,
+    "nvidia_zero": convert_openhands,
+    "r2e_gym": convert_openhands,
 }
 
 
@@ -165,28 +184,29 @@ def main():
                 except json.JSONDecodeError:
                     continue
                 rec = converter(row)
-                if rec is not None:
-                    # use GenericAdapter to normalize, then build_record
-                    from src.collect.normalizer import GenericAdapter, build_record, RawTrajectory
-                    import uuid
-                    common = GenericAdapter.to_common(rec["messages"])
-                    if not common:
-                        continue
-                    raw = RawTrajectory(
-                        task=rec["task"],
-                        messages=common,
-                        tool_schemas=[],
-                        harness="external",
-                        model_id=rec.get("model", ""),
-                        started_at=rec.get("started_at", ""),
-                        verification=rec.get("verification", {}),
-                        generator=rec.get("generator", {}),
-                    )
-                    record, problems = build_record(raw, f"ext_{tag}_{total:06d}")
-                    if record is not None:
-                        f_out.write(json.dumps(record, ensure_ascii=False) + "\n")
-                        total += 1
-                        n += 1
+                if rec is None:
+                    continue
+                from src.collect.normalizer import GenericAdapter, build_record, RawTrajectory
+                import time as _time
+                common = GenericAdapter.to_common(rec["messages"])
+                if not common:
+                    continue
+                raw = RawTrajectory(
+                    task=rec["task"],
+                    messages=common,
+                    tool_schemas=[],
+                    harness="external",
+                    model_id=rec.get("model", ""),
+                    started_at=rec.get("started_at", ""),
+                    verification=rec.get("verification", {}),
+                    generator=rec.get("generator", {}),
+                )
+                rid = f"traj_ext_{_time.strftime('%Y-%m-%d')}_{total:06d}"
+                record, problems = build_record(raw, rid)
+                if record is not None:
+                    f_out.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    total += 1
+                    n += 1
             print(f"  {tag}: {n} converted -> {out}")
 
     print(f"\n  total: {total} trajectories -> {out}")
