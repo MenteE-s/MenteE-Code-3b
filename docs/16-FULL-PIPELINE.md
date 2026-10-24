@@ -12,88 +12,112 @@ Create them at: https://huggingface.co/new (select "Model" or "Dataset", check "
 
 ---
 
-## Phase 1: Vast.ai setup (one-time, ~10 min)
+## Phase 1: Vast.ai setup (one-time, ~15 min)
 
 ### 1.1 Rent a GPU
 ```
-vast.ai → search "RTX 4090" → sort by price → rent cheapest (~$0.30-0.40/hr)
+vast.ai → search "RTX 4090 / RTX 5090" → sort by price → rent
+Template: PyTorch (Vast) — NOT raw CUDA (avoids huge pip installs)
 SSH into the instance
 ```
+
+> **Speed check (learned the hard way):** some cheap hosts are shared/throttled.
+> After training starts, look at the `s/it` in the progress bar:
+> - ~2–4 s/it → good host, let it run
+> - **>8 s/it → shared GPU. Consider destroying and picking another host.**
+> Every minute spent deciding early saves hours later.
 
 ### 1.2 Install dependencies
 ```bash
 git clone https://github.com/MenteE-s/MenteE-Code-3b.git
 cd MenteE-Code-3b
-python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-train.txt
-huggingface-cli login  # paste your HF token
+hf auth login   # NOT huggingface-cli (not installed on vast templates)
 ```
 
 ### 1.3 Verify GPU
 ```bash
-nvidia-smi  # should show RTX 4090, 24GB
-python -c "import torch; print(torch.cuda.get_device_name(0))"
+nvidia-smi  # should show the rented GPU + VRAM
+python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 ```
 
 ---
 
-## Phase 2: Download + preprocess data (~30 min)
+## Phase 2: Download + preprocess data (~45 min)
 
-### 2.1 Download free trajectory datasets (100K rows)
+### 2.1 Download free trajectory datasets
 ```bash
 python scripts/download_datasets.py --out data/external --max-rows 25000
 ```
-Downloads 25,000 rows from each of 4 sources = ~100,000 trajectories total.
+Downloads 25,000 rows from each of 4 sources = ~100,000 raw trajectories.
 No `--max-rows` would download TBs — don't do that.
 
-### 2.2 Convert to mente format
+### 2.2 Convert to mente format (~10–15 min, CPU-bound — the GPU is idle here, that's normal)
 ```bash
 python scripts/preprocess_external.py --in data/external --out data/external/prepared.jsonl
+# expect: ~78,000 converted
 ```
 
-### 2.3 Merge with your generated trajectories
+### 2.3 Identity data + merge
 ```bash
-python -m src.collect merge --inputs data/external/prepared.jsonl datasets/collectors/syab/train.jsonl --out data/training/train.jsonl
+python scripts/generate_identity_data.py --out data/identity/identity.jsonl --count 500
+
+# NOTE: the merge writer refuses to overwrite (append-only by design).
+# On a fresh instance this file won't exist; on a reused one, delete first:
+rm -f data/training/train.jsonl
+
+python -m src.collect merge --inputs data/external/prepared.jsonl datasets/collectors/syab/train.jsonl data/identity/identity.jsonl --out data/training/train.jsonl
+# expect: ~53,500 accepted (25K dup-content dropped by dedup, 0 invalid)
 ```
 
-### 2.4 Verify the dataset
+### 2.4 Shuffle in place (CRITICAL — do not skip)
 ```bash
-wc -l data/training/train.jsonl  # should be ~100,032
-python -m src.collect verify --path data/training/train.jsonl
+shuf -o data/training/train.jsonl data/training/train.jsonl
+wc -l data/training/train.jsonl   # still 53567
 ```
+Why: `--max-samples N` takes the FIRST N rows. Unshuffled, that's 100% nvidia_zero
+and zero identity/syab rows. `shuf -o` edits the file in place so it needs no extra
+disk space (plain `shuf a > b` can fail with "No space left on device" on a 30 GB disk).
 
 ---
 
-## Phase 3: Train (~4 hours, ~$1.60)
+## Phase 3: Train (~5 hours)
 
 ### 3.1 Run training
 ```bash
 python scripts/train_smoke.py \
   --data data/training/train.jsonl \
-  --max-samples 999999 \
+  --max-samples 20000 \
   --model Qwen/Qwen2.5-Coder-3B-Instruct \
-  --output outputs/full_run
+  --output outputs/full_run \
+  --epochs 1 \
+  --batch-size 4 \
+  --grad-accum 4 \
+  --max-seq-length 4096 \
+  --context-length 131072
 ```
 
-**Note:** Modify `train_smoke.py` for full run:
-- Set `num_train_epochs=3`
-- Set `per_device_train_batch_size=4`
-- Set `gradient_accumulation_steps=4`
-- Set `learning_rate=2e-4`
-- Set `max_seq_length=4096`
-- Set `bf16=True`
+- 20,000 shuffled samples × 1 epoch ≈ **1,250 steps**. Loss should hit ~0.4 within
+  the first 100 steps; a 3-epoch full run adds <5% quality for 5x the time.
+- `--context-length 131072` writes YaRN rope-scaling into config.json AFTER training
+  so the published model advertises 128K context.
+- The `warmup_ratio (skipped)` line is harmless (transformers 5.x compat).
+- The `66785 > 32768` tokenizer warning is harmless (rows are truncated to 4096).
 
 ### 3.2 Monitor training
 ```bash
 # In another terminal
-watch -n 10 nvidia-smi  # GPU utilization
-tail -f outputs/full_run/trainer_state.json  # training progress
+watch -n 10 nvidia-smi                                  # GPU util should be 90%+
+df -h /                                                 # keep >2 GB free
 ```
+
+Healthy signs: `loss` falling (1.6 → 0.6 in ~30 steps), `grad_norm` < 1, no NaN.
 
 ### 3.3 Verify model saved
 ```bash
-ls outputs/full_run/  # should have model weights, tokenizer, adapter
-du -sh outputs/full_run/  # should be ~6GB
+ls outputs/full_run/      # config.json, model safetensors, tokenizer, adapter
+du -sh outputs/full_run/  # ~6 GB
+grep -A3 rope_scaling outputs/full_run/config.json   # YaRN block should be present
 ```
 
 ---
@@ -125,6 +149,34 @@ https://huggingface.co/MenteEAI/MenteE-Code-3B
 # On vast.ai dashboard: terminate instance
 # Or via CLI:
 vastai destroy instance <instance_id>
+```
+
+Safe to destroy any time BEFORE Phase 4 — everything regenerates:
+scripts live in git, data re-downloads from HuggingFace, the model re-downloads
+on next launch. Nothing irreplaceable ever lives on the instance.
+
+---
+
+## Gotchas (all learned in real runs — read before debugging)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `AppendError: train.jsonl already contains data` | merge writer is append-only by design | `rm -f data/training/train.jsonl` before merging |
+| `KeyError: 'rope_type'` on model load | transformers 5.x rejects `rope_scaling` kwarg at load | fixed — YaRN is applied to config.json post-training |
+| `SFTTrainer.__init__() got an unexpected keyword argument 'tokenizer'` | trl 0.12+ renamed it | fixed — script uses `processing_class` |
+| `SFTConfig ... unexpected keyword 'warmup_ratio'` | transformers 5.x dropped fields | harmless — script filters kwargs by signature and prints what it skipped |
+| `protobuf` version conflict warnings | vLLM vs unsloth-zoo metadata | cosmetic, ignore. Do NOT downgrade protobuf (breaks vllm) |
+| unsloth `ConstantLengthDataset` import error | unsloth needs older trl | don't fight it — `train_smoke.py` produces the same model, ~2x slower |
+| `shuf: No space left on device` | 30 GB disk full | clean caches (below), then `shuf -o file file` (in place) |
+| 16 s/it instead of ~3 s/it | shared/throttled GPU host | destroy, rent another host, re-test early |
+| `huggingface-cli: command not found` | vast template ships only new CLI | use `hf auth login` |
+
+### Disk cleanup on a 30 GB instance (safe deletions)
+```bash
+rm -rf /root/.cache/huggingface/datasets   # tokenized cache, regenerated automatically
+rm -rf /root/.cache/pip
+rm -rf data/external/nvidia_zero data/external/openhands data/external/r2e_gym data/external/swe_agent  # raw sources; prepared.jsonl is what we use
+# NEVER delete /root/.cache/huggingface/hub — that's the base model
 ```
 
 ---
