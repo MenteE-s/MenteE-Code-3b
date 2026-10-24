@@ -20,6 +20,7 @@ def main():
     ap.add_argument("--max-samples", type=int, default=50)
     ap.add_argument("--model", default="Qwen/Qwen2.5-Coder-1.5B-Instruct")
     ap.add_argument("--output", default="outputs/smoke_test")
+    ap.add_argument("--context-length", type=int, default=32768, help="target context window (32768 native, 131072 with YaRN)")
     args = ap.parse_args()
 
     # Check dependencies
@@ -73,11 +74,18 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    rope_scaling = None
+    if args.context_length > 32768:
+        factor = args.context_length / 32768
+        rope_scaling = {"type": "yarn", "factor": factor}
+        print(f"  YaRN scaling: 32768 -> {args.context_length} (factor {factor:.1f})")
+
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype="auto",
         device_map="auto",
         trust_remote_code=True,
+        rope_scaling=rope_scaling,
     )
 
     # LoRA
@@ -105,7 +113,7 @@ def main():
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         learning_rate=2e-4,
-        max_length=2048,
+        max_length=args.context_length,
         logging_steps=1,
         save_steps=100,
         bf16=True,

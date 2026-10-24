@@ -25,6 +25,7 @@ def main():
     ap.add_argument("--grad-accum", type=int, default=4)
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--max-seq-length", type=int, default=4096)
+    ap.add_argument("--context-length", type=int, default=32768, help="target context window (32768 native, 131072 with YaRN)")
     ap.add_argument("--lora-rank", type=int, default=64)
     args = ap.parse_args()
 
@@ -69,13 +70,21 @@ def main():
         print("  ! too few samples, need at least 5")
         raise SystemExit(1)
 
+    # YaRN scaling for extended context (32K native -> target)
+    rope_scaling = None
+    if args.context_length > 32768:
+        factor = args.context_length / 32768
+        rope_scaling = {"type": "yarn", "factor": factor}
+        print(f"  YaRN scaling: 32768 -> {args.context_length} (factor {factor:.1f})")
+
     # Load model with Unsloth (2-5x faster, less VRAM)
     print(f"  loading {args.model} with Unsloth (4-bit)...")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=args.model,
-        max_seq_length=args.max_seq_length,
+        max_seq_length=args.context_length,
         dtype=None,  # auto-detect
         load_in_4bit=True,
+        rope_scaling=rope_scaling,
     )
 
     # LoRA config (Unsloth optimized)
@@ -106,7 +115,7 @@ def main():
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
-        max_length=args.max_seq_length,
+        max_length=args.context_length,
         logging_steps=10,
         save_steps=500,
         save_total_limit=3,
