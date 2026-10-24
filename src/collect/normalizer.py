@@ -367,6 +367,19 @@ def build_record(
     if not messages:
         return None, ["no messages"]
 
+    # -- inject MenteE identity into system prompt ----------------------------
+    _IDENTITY = (
+        "You are MenteE Code, a coding assistant built by MenteE. "
+        "You help developers with software engineering tasks. "
+        "You are not Qwen, GPT, Claude, Llama, DeepSeek, or any other model "
+        "\u2014 you are MenteE Code, created by MenteE."
+    )
+    if messages and messages[0].role == "system":
+        if "MenteE Code" not in (messages[0].content or ""):
+            messages[0].content = _IDENTITY + "\\n\\n" + (messages[0].content or "")
+    else:
+        messages = [CommonMessage(role="system", content=_IDENTITY)] + list(messages)
+
     # -- turns ---------------------------------------------------------------
     turns: list[dict[str, Any]] = []
     index = 0
