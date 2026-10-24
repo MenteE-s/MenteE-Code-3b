@@ -21,6 +21,10 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen2.5-Coder-1.5B-Instruct")
     ap.add_argument("--output", default="outputs/smoke_test")
     ap.add_argument("--context-length", type=int, default=32768, help="target context window (32768 native, 131072 with YaRN)")
+    ap.add_argument("--epochs", type=int, default=1)
+    ap.add_argument("--batch-size", type=int, default=1)
+    ap.add_argument("--grad-accum", type=int, default=4)
+    ap.add_argument("--max-seq-length", type=int, default=2048)
     args = ap.parse_args()
 
     # Check dependencies
@@ -109,11 +113,11 @@ def main():
 
     config = SFTConfig(
         output_dir=str(out_dir),
-        num_train_epochs=1,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
+        num_train_epochs=args.epochs,
+        per_device_train_batch_size=args.batch_size,
+        gradient_accumulation_steps=args.grad_accum,
         learning_rate=2e-4,
-        max_length=args.context_length,
+        max_length=args.max_seq_length,
         logging_steps=1,
         save_steps=100,
         bf16=True,
