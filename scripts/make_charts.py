@@ -95,15 +95,20 @@ def chart_gpu(gpu_log: Path, out: Path):
     def num(val: str) -> float:
         return float(str(val).replace(",", "").replace("W", "").replace("MiB", "").strip())
 
+    def norm(r: dict) -> dict:
+        # headers look like "utilization.gpu [%]", "power.draw [W]" -> normalize keys
+        return {k.split(" [")[0].strip(): v for k, v in r.items()}
+
     def parse_ts(s: str) -> datetime:
         # nvidia-smi timestamps may include fractional seconds: 2026/10/25 08:20:15.802
         return datetime.strptime(s.split(".")[0].strip(), "%Y/%m/%d %H:%M:%S")
 
+    rows = [norm(r) for r in rows]
     t0 = parse_ts(rows[0]["timestamp"])
     minutes = [(parse_ts(r["timestamp"]) - t0).total_seconds() / 60 for r in rows]
     util = [num(r["utilization.gpu"]) for r in rows]
-    vram = [num(r["memory.used \rMiB" if "memory.used \rMiB" in r else "memory.used [MiB]"]) / 1024 for r in rows]
-    power = [num(r.get("power.draw \rW", r.get("power.draw [W]"))) for r in rows]
+    vram = [num(r["memory.used"]) / 1024 for r in rows]
+    power = [num(r["power.draw"]) for r in rows]
 
     fig, axes = plt.subplots(3, 1, figsize=(9, 8), sharex=True)
     axes[0].plot(minutes, util, color=MENTEE)
@@ -194,10 +199,23 @@ def chart_landscape(tuned: Path | None, out: Path):
     print("  - model_landscape.png")
 
 
+def find_trainer_state(primary: str) -> Path | None:
+    """Accept the file directly, or find the newest checkpoint's copy."""
+    p = Path(primary)
+    if p.exists():
+        return p
+    base = p.parent
+    if base.exists():
+        cands = sorted(base.glob("checkpoint-*/trainer_state.json"))
+        if cands:
+            return cands[-1]  # highest checkpoint-N
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--trainer-state", default="outputs/full_run/trainer_state.json")
-    ap.add_argument("--humaneval-tuned", default="outputs/humaneval_results.json")
+    ap.add_argument("--humaneval-tuned", default="outputs/humaneval_results_tuned.json")
     ap.add_argument("--humaneval-base", default="outputs/humaneval_results_base.json")
     ap.add_argument("--gpu-log", default="outputs/gpu_log.csv")
     ap.add_argument("--out", default="outputs/charts")
@@ -207,11 +225,14 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
 
     log_history = []
-    if Path(args.trainer_state).exists():
-        state = json.loads(Path(args.trainer_state).read_text())
+    state_path = find_trainer_state(args.trainer_state)
+    if state_path:
+        print(f"  trainer state: {state_path}")
+        state = json.loads(state_path.read_text())
         log_history = state.get("log_history", [])
     else:
-        print(f"  ! no trainer_state at {args.trainer_state} — training charts skipped")
+        print(f"  ! no trainer_state found at {args.trainer_state} (or checkpoint-*/)" +
+              " — training charts skipped")
 
     if log_history:
         chart_loss(log_history, out)
