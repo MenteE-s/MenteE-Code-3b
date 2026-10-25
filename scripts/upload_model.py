@@ -27,9 +27,6 @@ def main():
         raise SystemExit(1)
 
     token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if not token:
-        print("  ! set HF_TOKEN env var or run: huggingface-cli login")
-        raise SystemExit(1)
 
     try:
         from huggingface_hub import HfApi, create_repo
@@ -37,7 +34,16 @@ def main():
         print("  ! install: pip install huggingface_hub")
         raise SystemExit(1)
 
+    # token may come from env OR from a stored `hf auth login` credential
     api = HfApi(token=token)
+    try:
+        who = api.whoami()
+        print(f"  logged in as: {who.get('name', '?')}")
+    except Exception as e:
+        print(f"  ! not authenticated ({e})")
+        print("  ! set HF_TOKEN env var or run: hf auth login")
+        raise SystemExit(1)
+
     try:
         create_repo(args.repo, private=args.private, token=token, exist_ok=True)
         print(f"  created/verified repo: {args.repo} (private={args.private})")
