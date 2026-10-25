@@ -95,11 +95,12 @@ def chart_gpu(gpu_log: Path, out: Path):
     def num(val: str) -> float:
         return float(str(val).replace(",", "").replace("W", "").replace("MiB", "").strip())
 
-    t0 = datetime.strptime(rows[0]["timestamp"], "%Y/%m/%d %H:%M:%S")
-    minutes = [
-        (datetime.strptime(r["timestamp"], "%Y/%m/%d %H:%M:%S") - t0).total_seconds() / 60
-        for r in rows
-    ]
+    def parse_ts(s: str) -> datetime:
+        # nvidia-smi timestamps may include fractional seconds: 2026/10/25 08:20:15.802
+        return datetime.strptime(s.split(".")[0].strip(), "%Y/%m/%d %H:%M:%S")
+
+    t0 = parse_ts(rows[0]["timestamp"])
+    minutes = [(parse_ts(r["timestamp"]) - t0).total_seconds() / 60 for r in rows]
     util = [num(r["utilization.gpu"]) for r in rows]
     vram = [num(r["memory.used \rMiB" if "memory.used \rMiB" in r else "memory.used [MiB]"]) / 1024 for r in rows]
     power = [num(r.get("power.draw \rW", r.get("power.draw [W]"))) for r in rows]
