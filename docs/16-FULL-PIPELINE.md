@@ -143,6 +143,49 @@ https://huggingface.co/MenteEAI/MenteE-Code-3B
 
 ---
 
+### 4.5 Export GGUF — the "lightweight" release (~2 GB, runs anywhere)
+
+Do this on your LOCAL machine (the vast instance disk is tight, and quantizing
+needs no GPU):
+
+```bash
+# 1. pull the trained model you just uploaded
+hf download MenteEAI/MenteE-Code-3B --local-dir model-full   # or: huggingface-cli download
+
+# 2. convert with llama.cpp
+git clone https://github.com/ggerganov/llama.cpp
+pip install -r llama.cpp/requirements.txt
+python llama.cpp/convert_hf_to_gguf.py model-full --outfile mentee-f16.gguf --outtype f16
+
+# 3. quantize (Q4_K_M is the sweet spot: ~2 GB, minimal quality loss)
+./llama.cpp/llama-quantize mentee-f16.gguf MenteE-Code-3B-Q8_0.gguf Q8_0      # ~3.3 GB, near-lossless
+./llama.cpp/llama-quantize mentee-f16.gguf MenteE-Code-3B-Q4_K_M.gguf Q4_K_M  # ~2.0 GB, recommended
+
+# 4. upload both to the GGUF repo
+hf upload MenteEAI/MenteE-Code-3B-GGUF MenteE-Code-3B-Q4_K_M.gguf
+hf upload MenteEAI/MenteE-Code-3B-GGUF MenteE-Code-3B-Q8_0.gguf
+```
+
+### Ollama Modelfile (bakes in the MenteE identity — users get it with one command)
+
+```
+# File: Modelfile
+FROM ./MenteE-Code-3B-Q4_K_M.gguf
+SYSTEM """You are MenteE Code, a coding assistant built by MenteE. You always identify as MenteE Code, created by MenteE."""
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+```
+
+```bash
+ollama create mentee-code -f Modelfile
+ollama run mentee-code
+```
+
+> Serving tip: 32K context is the fast/cheap default. 128K (YaRN) works but costs
+> ~4x KV-cache memory — expose it as an option, not the default.
+
+---
+
 ## Phase 5: Terminate Vast.ai (stop paying)
 
 ```bash
