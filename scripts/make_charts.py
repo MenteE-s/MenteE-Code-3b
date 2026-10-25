@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -93,7 +94,8 @@ def chart_gpu(gpu_log: Path, out: Path):
         return
 
     def num(val: str) -> float:
-        return float(str(val).replace(",", "").replace("W", "").replace("MiB", "").strip())
+        m = re.search(r"-?\d+(?:\.\d+)?", str(val))
+        return float(m.group()) if m else 0.0
 
     def norm(r: dict) -> dict:
         # headers look like "utilization.gpu [%]", "power.draw [W]" -> normalize keys
