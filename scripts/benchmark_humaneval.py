@@ -100,7 +100,7 @@ def main():
     from datasets import load_dataset
 
     print(f"  loading HumanEval (164 problems, running {args.limit})...")
-    ds = list(load_dataset("openai_humaneval", split="test"))[: args.limit]
+    ds = list(load_dataset("openai/openai_humaneval", split="test"))[: args.limit]
 
     print(f"  loading {args.model}...")
     from transformers import AutoModelForCausalLM, AutoTokenizer
